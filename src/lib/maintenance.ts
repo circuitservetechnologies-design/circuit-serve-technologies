@@ -4,6 +4,10 @@ const LOCAL_STORAGE_MAINTENANCE_KEY = 'cst_maintenance_mode_v1';
 const MAINTENANCE_SETTING_KEY = 'maintenance_mode';
 
 export async function getMaintenanceStatus(): Promise<boolean> {
+  // NOTE: Server API (or Supabase) provides the authoritative maintenance state.
+  // Local storage is only used as a fallback after server checks.
+
+
   // 1. Try server API route (works across all devices connecting to same server)
   try {
     const res = await fetch('/api/maintenance', { cache: 'no-store' });
