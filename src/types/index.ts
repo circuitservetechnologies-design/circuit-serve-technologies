@@ -5,6 +5,7 @@ export interface User {
   role: 'admin' | 'client';
   organization?: string;
   phone?: string;
+  password_hash?: string;
   created_at: string;
 }
 

@@ -300,6 +300,23 @@ export default function ClientPortalPage() {
                       ? 'Sign In to Dashboard'
                       : 'Create My Account & Enter Hub'}
                   </button>
+
+                  {/* Forgot Password — only shown on Login tab */}
+                  {authMode === 'login' && (
+                    <div className="text-center pt-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAuthError(
+                            '🔐 To reset your password, email us at circuitservetechnologies@gmail.com or WhatsApp +91 8985043496 with your registered email address.'
+                          )
+                        }
+                        className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline font-mono"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+                  )}
                 </form>
 
                 <div className="pt-2 text-center text-xs text-slate-500">

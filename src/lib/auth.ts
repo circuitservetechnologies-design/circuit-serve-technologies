@@ -4,6 +4,19 @@ import { supabase, isSupabaseConfigured } from './supabase';
 const LOCAL_STORAGE_USERS_KEY = 'cst_users_v1';
 const LOCAL_STORAGE_SESSION_KEY = 'cst_current_user_v1';
 
+/** Simple deterministic hash — NOT cryptographic, but good enough for localStorage sessions */
+function hashPassword(password: string): string {
+  // btoa of repeated transformation to make it non-trivial to reverse from storage
+  const salted = `cst_salt_2026::${password}::circuit_serve`;
+  let hash = 0;
+  for (let i = 0; i < salted.length; i++) {
+    const char = salted.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return btoa(`${hash}_${salted.length}_${password.length}`);
+}
+
 // Seed default admin in local storage if not exists
 function getStoredUsers(): User[] {
   if (typeof window === 'undefined') return [];
@@ -56,6 +69,10 @@ export async function registerClient(data: {
     return { user: null, error: 'An account with this email already exists. Please sign in.' };
   }
 
+  if (!data.password || data.password.trim().length < 6) {
+    return { user: null, error: 'Password must be at least 6 characters.' };
+  }
+
   const newUser: User = {
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `usr_${Date.now()}`,
     name: data.name.trim(),
@@ -63,6 +80,7 @@ export async function registerClient(data: {
     role: 'client',
     organization: data.organization?.trim() || '',
     phone: data.phone?.trim() || '',
+    password_hash: hashPassword(data.password.trim()),
     created_at: new Date().toISOString(),
   };
 
@@ -117,28 +135,21 @@ export async function loginUser(email: string, passOrPin: string): Promise<{ use
   // Check existing users in storage
   const users = getStoredUsers();
   const found = users.find((u) => u.email.toLowerCase() === emailNorm);
-  if (found) {
-    setCurrentUser(found);
-    return { user: found };
+
+  if (!found) {
+    // No account exists — do NOT auto-create. Force registration.
+    return { user: null, error: 'No account found with this email. Please register first.' };
   }
 
-  // If user not found but has entered details, auto-create client collaborator account
-  if (emailNorm.includes('@')) {
-    const autoName = emailNorm.split('@')[0];
-    const newUser: User = {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `usr_${Date.now()}`,
-      name: autoName.charAt(0).toUpperCase() + autoName.slice(1),
-      email: emailNorm,
-      role: 'client',
-      created_at: new Date().toISOString(),
-    };
-    users.push(newUser);
-    saveStoredUsers(users);
-    setCurrentUser(newUser);
-    return { user: newUser };
+  // Validate password if stored
+  if (found.password_hash) {
+    if (hashPassword(pinInput) !== found.password_hash) {
+      return { user: null, error: 'Incorrect password. Please try again.' };
+    }
   }
 
-  return { user: null, error: 'Invalid email or password.' };
+  setCurrentUser(found);
+  return { user: found };
 }
 
 export function logoutUser() {

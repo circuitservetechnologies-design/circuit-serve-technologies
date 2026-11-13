@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  getProjects, 
-  addProject, 
-  deleteProject, 
-  updateProject, 
+import {
+  getProjects,
+  addProject,
+  deleteProject,
+  updateProject,
   getInquiries,
   getClientProjects,
   updateClientProject,
@@ -18,19 +18,19 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { Project, Inquiry, ClientProject, User } from '@/types';
 import CSTLogo from '@/components/CSTLogo';
 import ThemeToggle from '@/components/ThemeToggle';
-import { 
-  ShieldCheck, 
-  Lock, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  Check, 
-  Copy, 
-  ExternalLink, 
-  Database, 
-  Layers, 
-  Mail, 
-  Eye, 
+import {
+  ShieldCheck,
+  Lock,
+  Plus,
+  Trash2,
+  Edit3,
+  Check,
+  Copy,
+  ExternalLink,
+  Database,
+  Layers,
+  Mail,
+  Eye,
   Sparkles,
   ArrowLeft,
   AlertCircle,
@@ -360,7 +360,7 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   type="password"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  placeholder="Enter PIN (Default: CST@2026)"
+                  placeholder="Enter PIN"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 font-mono tracking-widest"
                   autoFocus
                 />
@@ -398,7 +398,7 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-slate-200 transition-colors">
-      
+
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-white/90 dark:bg-navy-900/90 border-b border-slate-200 dark:border-cyan-900/40 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -443,7 +443,7 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
 
       {/* Main Body */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        
+
         {/* Statistics Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800">
@@ -471,55 +471,50 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
         <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('client_proposals')}
-            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${
-              activeTab === 'client_proposals'
-                ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${activeTab === 'client_proposals'
+              ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
           >
             Client Hardware Requests ({clientProposals.length})
           </button>
 
           <button
             onClick={() => setActiveTab('projects')}
-            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${
-              activeTab === 'projects'
-                ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${activeTab === 'projects'
+              ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
           >
             Public Website Projects ({projects.length})
           </button>
 
           <button
             onClick={() => setActiveTab('users')}
-            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${
-              activeTab === 'users'
-                ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${activeTab === 'users'
+              ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
           >
             Client Accounts ({usersList.length})
           </button>
 
           <button
             onClick={() => setActiveTab('inquiries')}
-            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${
-              activeTab === 'inquiries'
-                ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${activeTab === 'inquiries'
+              ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
           >
             Inquiries ({inquiries.length})
           </button>
 
           <button
             onClick={() => setActiveTab('setup')}
-            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${
-              activeTab === 'setup'
-                ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
-                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={`px-4 py-2 text-xs font-mono font-medium rounded-lg whitespace-nowrap transition-all ${activeTab === 'setup'
+              ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/50'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
           >
             Database & Vercel Setup
           </button>
@@ -624,7 +619,7 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                         >
                           {cp.admin_notes ? 'Edit Engineering Note' : '+ Send Note to Client'}
                         </button>
-                        
+
                         <a
                           href={`mailto:${cp.user_email}?subject=Regarding Your CST Hardware Project: ${cp.title}`}
                           className="px-3 py-1.5 text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg hover:border-cyan-500 transition-colors"
