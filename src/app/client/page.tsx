@@ -8,21 +8,21 @@ import { useAuth } from '@/components/AuthContext';
 import { submitClientProject, getClientProjects } from '@/lib/projectsStore';
 import { ClientProject } from '@/types';
 import { COMPANY_INFO } from '@/lib/constants';
-import { 
-  Cpu, 
-  Plus, 
-  Layers, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  Send, 
-  FileText, 
-  ExternalLink, 
-  ArrowRight, 
-  Building2, 
-  Phone, 
-  Mail, 
-  Lock, 
+import {
+  Cpu,
+  Plus,
+  Layers,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Send,
+  FileText,
+  ExternalLink,
+  ArrowRight,
+  Building2,
+  Phone,
+  Mail,
+  Lock,
   User as UserIcon,
   Sparkles,
   LogOut,
@@ -31,7 +31,7 @@ import {
 
 export default function ClientPortalPage() {
   const { user, login, register, logout, loading: authLoading } = useAuth();
-  
+
   // Auth Form State
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -163,12 +163,12 @@ export default function ClientPortalPage() {
 
       <main className="flex-1 pt-32 pb-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           {/* If NOT logged in, show Client Login / Register Portal */}
           {!user ? (
             <div className="max-w-md mx-auto my-8">
               <div className="bg-white dark:bg-navy-900/90 border border-slate-200 dark:border-cyan-800/60 rounded-2xl p-8 shadow-2xl backdrop-blur-xl space-y-6">
-                
+
                 <div className="text-center space-y-2">
                   <div className="w-12 h-12 bg-cyan-100 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400 rounded-2xl flex items-center justify-center mx-auto border border-cyan-300 dark:border-cyan-800 shadow-inner">
                     <FolderKanban className="w-6 h-6" />
@@ -186,22 +186,20 @@ export default function ClientPortalPage() {
                   <button
                     type="button"
                     onClick={() => { setAuthMode('login'); setAuthError(null); }}
-                    className={`flex-1 py-2 text-xs font-mono font-medium rounded-lg transition-all ${
-                      authMode === 'login'
-                        ? 'bg-white dark:bg-cyan-950 text-cyan-600 dark:text-cyan-300 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
+                    className={`flex-1 py-2 text-xs font-mono font-medium rounded-lg transition-all ${authMode === 'login'
+                      ? 'bg-white dark:bg-cyan-950 text-cyan-600 dark:text-cyan-300 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
                   >
                     Sign In
                   </button>
                   <button
                     type="button"
                     onClick={() => { setAuthMode('register'); setAuthError(null); }}
-                    className={`flex-1 py-2 text-xs font-mono font-medium rounded-lg transition-all ${
-                      authMode === 'register'
-                        ? 'bg-white dark:bg-cyan-950 text-cyan-600 dark:text-cyan-300 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
+                    className={`flex-1 py-2 text-xs font-mono font-medium rounded-lg transition-all ${authMode === 'register'
+                      ? 'bg-white dark:bg-cyan-950 text-cyan-600 dark:text-cyan-300 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                      }`}
                   >
                     Create Account
                   </button>
@@ -226,7 +224,7 @@ export default function ClientPortalPage() {
                           required
                           value={name}
                           onChange={(e) => setName(e.target.value)}
-                          placeholder="e.g. Ramesh Kumar"
+                          placeholder="Enter Your name"
                           className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                         />
                       </div>
@@ -240,7 +238,7 @@ export default function ClientPortalPage() {
                             type="text"
                             value={organization}
                             onChange={(e) => setOrganization(e.target.value)}
-                            placeholder="e.g. Aditya Univ / Tech Startup"
+                            placeholder="Enter Organization or College Name"
                             className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                           />
                         </div>
@@ -253,7 +251,7 @@ export default function ClientPortalPage() {
                             type="tel"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
-                            placeholder="+91 98765..."
+                            placeholder="Enter Your Mobile Number"
                             className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                           />
                         </div>
@@ -270,7 +268,7 @@ export default function ClientPortalPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="client@company.com"
+                      placeholder="Enter Your Register Email"
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                     />
                   </div>
@@ -297,8 +295,8 @@ export default function ClientPortalPage() {
                     {authSubmitting
                       ? 'Processing...'
                       : authMode === 'login'
-                      ? 'Sign In to Dashboard'
-                      : 'Create My Account & Enter Hub'}
+                        ? 'Sign In to Dashboard'
+                        : 'Create My Account & Enter Hub'}
                   </button>
 
                   {/* Forgot Password — only shown on Login tab */}
@@ -329,7 +327,7 @@ export default function ClientPortalPage() {
               </div>
             </div>
           ) : (
-            
+
             /* If LOGGED IN, show Client Dashboard */
             <div className="space-y-8">
               {/* User Header Bar */}
@@ -381,8 +379,8 @@ export default function ClientPortalPage() {
                     How CST Hardware Collaboration Works:
                   </p>
                   <p>
-                    1. Click <strong>"Assign / Request New Project"</strong> to describe your board design, embedded firmware, or IoT requirement.<br/>
-                    2. Our engineering team at Surampalem will evaluate your specs, generate a technical feasibility quote, and initiate design milestones.<br/>
+                    1. Click <strong>"Assign / Request New Project"</strong> to describe your board design, embedded firmware, or IoT requirement.<br />
+                    2. Our engineering team at Surampalem will evaluate your specs, generate a technical feasibility quote, and initiate design milestones.<br />
                     3. Track development stages directly below in real time. Upon project completion, your project can be featured in our verified public showcase!
                   </p>
                 </div>
@@ -439,15 +437,14 @@ export default function ClientPortalPage() {
                           </div>
 
                           <span
-                            className={`px-2.5 py-1 text-[11px] font-mono rounded font-semibold uppercase shrink-0 ${
-                              p.status === 'Completed'
-                                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800'
-                                : p.status === 'In Development' || p.status === 'Testing & Validation'
+                            className={`px-2.5 py-1 text-[11px] font-mono rounded font-semibold uppercase shrink-0 ${p.status === 'Completed'
+                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800'
+                              : p.status === 'In Development' || p.status === 'Testing & Validation'
                                 ? 'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-400 border border-sky-300 dark:border-sky-800'
                                 : p.status === 'Approved'
-                                ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-800'
-                                : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800'
-                            }`}
+                                  ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-800'
+                                  : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800'
+                              }`}
                           >
                             {p.status}
                           </span>
@@ -507,7 +504,7 @@ export default function ClientPortalPage() {
       {showNewProjectModal && user && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
           <div className="w-full max-w-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-cyan-800/60 rounded-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
-            
+
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 mb-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">
