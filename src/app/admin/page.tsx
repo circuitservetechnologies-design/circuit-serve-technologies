@@ -419,7 +419,7 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
               </div>
               {authError && (
                 <p className="mt-1.5 text-xs text-red-500 font-mono">
-                  Incorrect PIN. Default is <code className="bg-red-50 dark:bg-red-950 px-1 py-0.5 rounded">CST@2026</code>
+                  Incorrect PIN.
                 </p>
               )}
             </div>
