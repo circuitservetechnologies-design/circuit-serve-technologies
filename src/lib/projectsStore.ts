@@ -1,8 +1,9 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Project, Inquiry } from '@/types';
+import { Project, Inquiry, ClientProject } from '@/types';
 
 const LOCAL_STORAGE_KEY_PROJECTS = 'cst_projects_store_v1';
 const LOCAL_STORAGE_KEY_INQUIRIES = 'cst_inquiries_store_v1';
+const LOCAL_STORAGE_KEY_CLIENT_PROJECTS = 'cst_client_projects_v1';
 
 // Initial state is strictly empty as requested: "don't give any demo projects in project section"
 export async function getProjects(): Promise<Project[]> {
@@ -148,6 +149,146 @@ export async function deleteProject(id: string): Promise<boolean> {
 
   return false;
 }
+
+// ====================================================================
+// CLIENT COLLABORATION PROJECT PROPOSALS & REQUESTS
+// ====================================================================
+
+export async function submitClientProject(
+  proposal: Omit<ClientProject, 'id' | 'created_at' | 'updated_at' | 'status' | 'is_published_to_portfolio'>
+): Promise<ClientProject> {
+  const newClientProject: ClientProject = {
+    ...proposal,
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `clproj_${Date.now()}`,
+    status: 'Under Review',
+    is_published_to_portfolio: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('client_projects')
+        .insert([newClientProject])
+        .select()
+        .single();
+
+      if (!error && data) {
+        return data as ClientProject;
+      }
+    } catch (err) {
+      console.warn('Supabase client project insert exception:', err);
+    }
+  }
+
+  // Save to local storage
+  if (typeof window !== 'undefined') {
+    const existing: ClientProject[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS) || '[]');
+    const updated = [newClientProject, ...existing];
+    localStorage.setItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS, JSON.stringify(updated));
+  }
+
+  return newClientProject;
+}
+
+export async function getClientProjects(userId?: string): Promise<ClientProject[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      let query = supabase.from('client_projects').select('*').order('created_at', { ascending: false });
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+      const { data, error } = await query;
+      if (!error && data) {
+        return data as ClientProject[];
+      }
+    } catch (err) {
+      console.warn('Supabase get client projects failed:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    const list: ClientProject[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS) || '[]');
+    if (userId) {
+      return list.filter((p) => p.user_id === userId);
+    }
+    return list;
+  }
+
+  return [];
+}
+
+export async function updateClientProject(id: string, updates: Partial<ClientProject>): Promise<ClientProject | null> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('client_projects')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (!error && data) {
+        return data as ClientProject;
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    const list: ClientProject[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS) || '[]');
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...updates, updated_at: new Date().toISOString() };
+      localStorage.setItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS, JSON.stringify(list));
+      return list[idx];
+    }
+  }
+
+  return null;
+}
+
+export async function deleteClientProject(id: string): Promise<boolean> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase.from('client_projects').delete().eq('id', id);
+      if (!error) return true;
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    const list: ClientProject[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS) || '[]');
+    const filtered = list.filter((p) => p.id !== id);
+    localStorage.setItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS, JSON.stringify(filtered));
+    return true;
+  }
+
+  return false;
+}
+
+// Allows Admin to promote an approved client project directly to the Public Portfolio Showcase!
+export async function publishClientProjectToPublicPortfolio(
+  clientProjectId: string,
+  projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>
+): Promise<Project> {
+  const publishedProject = await addProject(projectData);
+  await updateClientProject(clientProjectId, {
+    is_published_to_portfolio: true,
+    status: 'Completed',
+  });
+  return publishedProject;
+}
+
+// ====================================================================
+// CONTACT INQUIRIES
+// ====================================================================
 
 export async function submitInquiry(inquiry: Omit<Inquiry, 'id' | 'created_at' | 'status'>): Promise<Inquiry> {
   const newInquiry: Inquiry = {

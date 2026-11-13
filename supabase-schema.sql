@@ -1,9 +1,45 @@
 -- ====================================================================
 -- Circuit Serve Technologies - Supabase Database Schema
--- Run this in your Supabase SQL Editor: Dashboard -> SQL Editor -> New Query
+-- Includes Public Portfolio, Client Accounts, Project Collaboration, & Inquiries
 -- ====================================================================
 
--- 1. Create the projects table
+-- 1. Create the users table (for client collaborators and admin)
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    role TEXT DEFAULT 'client', -- 'client' or 'admin'
+    organization TEXT,
+    phone TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Create the client project collaboration proposals table
+CREATE TABLE IF NOT EXISTS public.client_projects (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    user_email TEXT NOT NULL,
+    user_organization TEXT,
+    user_phone TEXT,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT NOT NULL,
+    specifications TEXT,
+    target_timeline TEXT,
+    estimated_budget TEXT,
+    reference_file_url TEXT,
+    status TEXT DEFAULT 'Under Review', -- 'Under Review', 'Approved', 'In Development', 'Testing & Validation', 'Completed', 'Declined'
+    admin_notes TEXT,
+    is_published_to_portfolio BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_projects_user_id ON public.client_projects(user_id);
+CREATE INDEX IF NOT EXISTS idx_client_projects_status ON public.client_projects(status);
+
+-- 3. Create the public projects showcase table
 CREATE TABLE IF NOT EXISTS public.projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
@@ -23,12 +59,11 @@ CREATE TABLE IF NOT EXISTS public.projects (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexing for fast search and category filtering
 CREATE INDEX IF NOT EXISTS idx_projects_category ON public.projects(category);
 CREATE INDEX IF NOT EXISTS idx_projects_featured ON public.projects(featured);
 CREATE INDEX IF NOT EXISTS idx_projects_created_at ON public.projects(created_at DESC);
 
--- 2. Create the contact inquiries table
+-- 4. Create the contact inquiries table
 CREATE TABLE IF NOT EXISTS public.inquiries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -36,65 +71,33 @@ CREATE TABLE IF NOT EXISTS public.inquiries (
     phone TEXT,
     service TEXT,
     message TEXT NOT NULL,
-    status TEXT DEFAULT 'New', -- 'New', 'Contacted', 'Closed'
+    status TEXT DEFAULT 'New',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_inquiries_created_at ON public.inquiries(created_at DESC);
 
--- 3. Enable Row Level Security (RLS)
+-- 5. Enable Row Level Security (RLS)
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
 
--- 4. Projects RLS Policies
--- Public can read all published projects
+-- 6. Access Policies
+DROP POLICY IF EXISTS "Enable all for users" ON public.users;
+CREATE POLICY "Enable all for users" ON public.users FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Enable all for client_projects" ON public.client_projects;
+CREATE POLICY "Enable all for client_projects" ON public.client_projects FOR ALL USING (true) WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Public can view projects" ON public.projects;
-CREATE POLICY "Public can view projects" 
-ON public.projects FOR SELECT 
-USING (true);
+CREATE POLICY "Public can view projects" ON public.projects FOR SELECT USING (true);
 
--- Allow insertions, updates, and deletions for admin operations
--- (If using anon key with Admin PIN/Password verification in the app, 
--- or using Supabase Service Key, this policy allows full control)
 DROP POLICY IF EXISTS "Enable all access for projects" ON public.projects;
-CREATE POLICY "Enable all access for projects" 
-ON public.projects FOR ALL 
-USING (true) 
-WITH CHECK (true);
+CREATE POLICY "Enable all access for projects" ON public.projects FOR ALL USING (true) WITH CHECK (true);
 
--- 5. Inquiries RLS Policies
--- Anyone can submit an inquiry through the contact form
 DROP POLICY IF EXISTS "Anyone can submit inquiry" ON public.inquiries;
-CREATE POLICY "Anyone can submit inquiry" 
-ON public.inquiries FOR INSERT 
-WITH CHECK (true);
+CREATE POLICY "Anyone can submit inquiry" ON public.inquiries FOR INSERT WITH CHECK (true);
 
--- Admin can read and manage inquiries
 DROP POLICY IF EXISTS "Enable read and manage for inquiries" ON public.inquiries;
-CREATE POLICY "Enable read and manage for inquiries" 
-ON public.inquiries FOR ALL 
-USING (true) 
-WITH CHECK (true);
-
--- 6. Setup Storage Bucket for Project Images (Optional)
--- Run this to create the bucket 'project-images' if not already present
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('project-images', 'project-images', true)
-ON CONFLICT (id) DO NOTHING;
-
--- Allow public access to view uploaded images
-DROP POLICY IF EXISTS "Public Access to Project Images" ON storage.objects;
-CREATE POLICY "Public Access to Project Images"
-ON storage.objects FOR SELECT
-USING (bucket_id = 'project-images');
-
--- Allow uploads to project-images
-DROP POLICY IF EXISTS "Allow uploads to Project Images" ON storage.objects;
-CREATE POLICY "Allow uploads to Project Images"
-ON storage.objects FOR INSERT
-WITH CHECK (bucket_id = 'project-images');
-
-DROP POLICY IF EXISTS "Allow delete from Project Images" ON storage.objects;
-CREATE POLICY "Allow delete from Project Images"
-ON storage.objects FOR DELETE
-USING (bucket_id = 'project-images');
+CREATE POLICY "Enable read and manage for inquiries" ON public.inquiries FOR ALL USING (true) WITH CHECK (true);
