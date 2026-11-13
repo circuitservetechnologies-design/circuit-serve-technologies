@@ -24,20 +24,13 @@ import {
   FileText, 
   Boxes, 
   Binary, 
-  Wifi, 
-  Factory, 
   ShieldCheck, 
   GraduationCap, 
   Rocket, 
   Globe, 
-  TrendingUp, 
-  Award, 
-  Clock, 
   Sparkles, 
   ExternalLink,
-  Plus,
-  FolderKanban,
-  Users
+  FolderKanban
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -61,20 +54,17 @@ export default function HomePage() {
             1. HERO SECTION
         ==================================================================== */}
         <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-32 overflow-hidden">
-          {/* Subtle grid and radial glow */}
           <div className="absolute inset-0 bg-circuit-pattern opacity-10 dark:opacity-25 pointer-events-none" />
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="flex flex-col items-center text-center max-w-4xl mx-auto space-y-6">
               
-              {/* Concept to Hardware Pill */}
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-100/80 dark:bg-cyan-950/90 border border-cyan-300 dark:border-cyan-800/80 text-cyan-800 dark:text-cyan-300 text-xs font-mono backdrop-blur-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
                 <span className="tracking-wide">{COMPANY_INFO.conceptToHardware}</span>
               </div>
 
-              {/* Startup Title & Tagline */}
               <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
                 Circuit Serve <br />
                 <span className="bg-gradient-to-r from-cyan-600 via-sky-500 to-teal-500 dark:from-cyan-400 dark:via-sky-300 dark:to-teal-300 bg-clip-text text-transparent">
@@ -90,7 +80,6 @@ export default function HomePage() {
                 Transforming complex electronics ideas into reliable, market-ready hardware. We bridge high-speed PCB design, embedded firmware, IoT prototyping, and semiconductor-ready digital architectures.
               </p>
 
-              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center gap-3.5 pt-4 w-full sm:w-auto">
                 <Link
                   href="/client"
@@ -120,7 +109,6 @@ export default function HomePage() {
                 </a>
               </div>
 
-              {/* Hardware Domain Badges */}
               <div className="pt-6 flex flex-wrap justify-center items-center gap-2 sm:gap-3 text-xs font-mono text-slate-600 dark:text-slate-400">
                 <span className="px-3 py-1 rounded-md bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-sm">PCB Design</span>
                 <span className="text-cyan-500">•</span>
@@ -160,7 +148,6 @@ export default function HomePage() {
                   {COMPANY_INFO.aboutSummary}
                 </p>
 
-                {/* Mission Callout Card */}
                 <div className="p-5 rounded-2xl bg-white dark:bg-gradient-to-r dark:from-navy-900 dark:to-cyan-950/60 border border-slate-200 dark:border-cyan-800/50 shadow-sm">
                   <div className="flex items-start gap-4">
                     <div className="p-2.5 rounded-xl bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 shrink-0">
@@ -177,7 +164,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Location & Phone Quick Info */}
                 <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-600 dark:text-slate-400 pt-2">
                   <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-300">
                     <MapPin className="w-4 h-4 text-cyan-500" />
@@ -191,7 +177,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Right Column Grid */}
               <div className="lg:col-span-5 grid grid-cols-2 gap-4">
                 <div className="p-5 rounded-xl bg-white dark:bg-navy-900/90 border border-slate-200 dark:border-slate-800 space-y-2 shadow-sm">
                   <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 uppercase">Focus 01</span>
@@ -240,7 +225,6 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* 6 Capabilities Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {COMPANY_INFO.capabilities.map((cap) => (
                 <div
@@ -436,7 +420,7 @@ export default function HomePage() {
         </section>
 
         {/* ====================================================================
-            7. PROJECTS SHOWCASE SECTION
+            7. PROJECTS SHOWCASE SECTION (Strictly Zero Admin leakage)
         ==================================================================== */}
         <section id="projects" className="py-24 relative">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -464,12 +448,11 @@ export default function HomePage() {
                 </Link>
 
                 <Link
-                  href="/admin"
+                  href="/client"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-700 dark:text-cyan-300 bg-slate-100 dark:bg-cyan-950 border border-slate-300 dark:border-cyan-800 hover:border-cyan-500 transition-colors"
-                  title="Upload projects via Admin Dashboard"
                 >
-                  <Plus className="w-3.5 h-3.5 text-cyan-500" />
-                  <span>Admin Upload</span>
+                  <FolderKanban className="w-3.5 h-3.5 text-cyan-500" />
+                  <span>Assign Project</span>
                 </Link>
               </div>
             </div>
@@ -489,9 +472,9 @@ export default function HomePage() {
                 <div className="w-14 h-14 rounded-2xl bg-cyan-100 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mx-auto border border-cyan-300 dark:border-cyan-800/80 shadow-inner">
                   <Layers className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Project Showcase Ready</h3>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Project Showcase</h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-                  As requested, demo projects are excluded. Your portfolio is connected to your backend database and ready for real project uploads!
+                  Our portfolio highlights custom hardware designs, PCB stackups, and IoT prototypes. Verified client projects will be featured here as they are completed.
                 </p>
                 <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
                   <Link
@@ -499,13 +482,13 @@ export default function HomePage() {
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-mono font-bold text-white dark:text-navy-950 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 transition-all shadow-md shadow-cyan-500/20"
                   >
                     <FolderKanban className="w-4 h-4" />
-                    <span>Collaborator Login & Submit Project</span>
+                    <span>Collaborate / Assign Your Project</span>
                   </Link>
                   <Link
-                    href="/admin"
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-navy-900 border border-slate-300 dark:border-slate-700"
+                    href="/#contact"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-navy-900 border border-slate-300 dark:border-slate-700 hover:border-cyan-500"
                   >
-                    <span>Admin Dashboard</span>
+                    <span>Contact Us</span>
                   </Link>
                 </div>
               </div>

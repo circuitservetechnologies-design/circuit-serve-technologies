@@ -9,7 +9,6 @@ import {
   Instagram, 
   FileText, 
   ArrowUpRight, 
-  ShieldCheck,
   FolderKanban,
   Cpu
 } from 'lucide-react';
@@ -133,9 +132,15 @@ export default function Footer() {
 
         </div>
 
-        {/* Bottom */}
+        {/* Bottom Bar: Zero visible admin block */}
         <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-mono">
-          <p>© {currentYear} {COMPANY_INFO.name}. Surampalem, Andhra Pradesh.</p>
+          <p>
+            © {currentYear} {COMPANY_INFO.name}. Surampalem, Andhra Pradesh
+            {/* Hidden subtle doorway for the startup owner only - no visible text */}
+            <Link href="/admin" className="opacity-0 hover:opacity-10 text-slate-700 cursor-default select-none" tabIndex={-1}>
+              .
+            </Link>
+          </p>
           
           <div className="flex items-center gap-4">
             <Link 
@@ -147,11 +152,10 @@ export default function Footer() {
             </Link>
             <span>•</span>
             <Link 
-              href="/admin" 
-              className="inline-flex items-center gap-1 text-slate-400 hover:text-cyan-400"
+              href="/#contact" 
+              className="text-slate-400 hover:text-cyan-400 transition-colors"
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin Authority</span>
+              Contact Engineering
             </Link>
           </div>
         </div>

@@ -11,10 +11,10 @@ import { Project } from '@/types';
 import { 
   Search, 
   Layers, 
-  Plus, 
   Cpu, 
   FolderKanban,
   ArrowRight,
+  Mail
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -136,7 +136,7 @@ export default function ProjectsPage() {
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
                   {projects.length === 0
-                    ? "Our project repository is configured and waiting for submissions. Collaborators can assign projects and admin can publish completed hardware."
+                    ? "Our project repository is configured and waiting for verified submissions. Hardware clients can collaborate with us directly to develop custom solutions."
                     : "No projects match your current search or category filter. Try clearing the filter."}
                 </p>
               </div>
@@ -152,10 +152,11 @@ export default function ProjectsPage() {
                   </Link>
 
                   <Link
-                    href="/admin"
+                    href="/#contact"
                     className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-navy-900 border border-slate-300 dark:border-slate-800 hover:border-cyan-500"
                   >
-                    <span>Admin Dashboard</span>
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>Contact Us</span>
                   </Link>
                 </div>
               )}

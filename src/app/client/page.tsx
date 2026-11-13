@@ -277,14 +277,14 @@ export default function ClientPortalPage() {
 
                   <div>
                     <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">
-                      {authMode === 'login' ? 'Password or Admin PIN' : 'Password'} *
+                      Password *
                     </label>
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={authMode === 'login' ? 'Enter password (or CST@2026 for admin)' : 'Create a secure password'}
+                      placeholder={authMode === 'login' ? 'Enter your account password' : 'Create a secure password'}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                     />
                   </div>
@@ -366,7 +366,7 @@ export default function ClientPortalPage() {
                   <p>
                     1. Click <strong>"Assign / Request New Project"</strong> to describe your board design, embedded firmware, or IoT requirement.<br/>
                     2. Our engineering team at Surampalem will evaluate your specs, generate a technical feasibility quote, and initiate design milestones.<br/>
-                    3. Track development stages directly below in real time. Upon project completion, CST admin can feature it in our verified showcase!
+                    3. Track development stages directly below in real time. Upon project completion, your project can be featured in our verified public showcase!
                   </p>
                 </div>
               </div>
