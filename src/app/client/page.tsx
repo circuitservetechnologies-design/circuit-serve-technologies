@@ -26,8 +26,80 @@ import {
   User as UserIcon,
   Sparkles,
   LogOut,
-  FolderKanban
+  FolderKanban,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+  RefreshCw,
+  ShieldCheck,
+  Key
 } from 'lucide-react';
+
+/** Generate a strong random password */
+function generateStrongPassword(): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '@#$!%&*';
+
+  const u1 = upper[Math.floor(Math.random() * upper.length)];
+  const l1 = lower[Math.floor(Math.random() * lower.length)];
+  const d1 = digits[Math.floor(Math.random() * digits.length)];
+  const s1 = symbols[Math.floor(Math.random() * symbols.length)];
+  const u2 = upper[Math.floor(Math.random() * upper.length)];
+  const l2 = lower[Math.floor(Math.random() * lower.length)];
+  const d2 = digits[Math.floor(Math.random() * digits.length)];
+  const s2 = symbols[Math.floor(Math.random() * symbols.length)];
+  const d3 = digits[Math.floor(Math.random() * digits.length)];
+  const l3 = lower[Math.floor(Math.random() * lower.length)];
+
+  const pool = [u1, l1, d1, s1, u2, l2, d2, s2, d3, l3];
+  return pool.sort(() => Math.random() - 0.5).join('');
+}
+
+/** Evaluate password strength */
+function getPasswordStrength(pwd: string): {
+  score: number;
+  label: string;
+  color: string;
+  hasLength: boolean;
+  hasUpper: boolean;
+  hasLower: boolean;
+  hasNumber: boolean;
+  hasSpecial: boolean;
+} {
+  const hasLength = pwd.length >= 8;
+  const hasUpper = /[A-Z]/.test(pwd);
+  const hasLower = /[a-z]/.test(pwd);
+  const hasNumber = /[0-9]/.test(pwd);
+  const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
+
+  let score = 0;
+  if (pwd.length >= 6) score++;
+  if (hasLength) score++;
+  if (hasUpper && hasLower) score++;
+  if (hasNumber && hasSpecial) score++;
+
+  let label = 'Too Short';
+  let color = 'bg-red-500';
+
+  if (score === 1) {
+    label = 'Weak (Min. 6 chars)';
+    color = 'bg-red-500';
+  } else if (score === 2) {
+    label = 'Moderate';
+    color = 'bg-amber-500';
+  } else if (score === 3) {
+    label = 'Good';
+    color = 'bg-cyan-500';
+  } else if (score >= 4) {
+    label = 'Strong & Secure';
+    color = 'bg-emerald-500';
+  }
+
+  return { score, label, color, hasLength, hasUpper, hasLower, hasNumber, hasSpecial };
+}
 
 export default function ClientPortalPage() {
   const { user, login, register, logout, loading: authLoading } = useAuth();
@@ -41,6 +113,35 @@ export default function ClientPortalPage() {
   const [phone, setPhone] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+
+  const handleSwitchMode = (mode: 'login' | 'register') => {
+    setAuthMode(mode);
+    setAuthError(null);
+    if (mode === 'register') {
+      // By default prefill a strong random password so user has a secure default
+      const strong = generateStrongPassword();
+      setPassword(strong);
+      setShowPassword(true);
+    } else {
+      setPassword('');
+      setShowPassword(false);
+    }
+  };
+
+  const handleGenerateNewPassword = () => {
+    const strong = generateStrongPassword();
+    setPassword(strong);
+    setShowPassword(true);
+  };
+
+  const handleCopyPassword = () => {
+    if (!password) return;
+    navigator.clipboard.writeText(password);
+    setCopiedPassword(true);
+    setTimeout(() => setCopiedPassword(false), 2000);
+  };
 
   // Projects State
   const [clientProjects, setClientProjects] = useState<ClientProject[]>([]);
@@ -86,20 +187,31 @@ export default function ClientPortalPage() {
           setAuthError(res.error || 'Login failed. Please check your credentials.');
         }
       } else {
-        if (!name || !email) {
-          setAuthError('Name and Email are required.');
+        // Validate all required fields before calling register
+        if (!name.trim()) {
+          setAuthError('Full name is required.');
+          setAuthSubmitting(false);
+          return;
+        }
+        if (!email.trim()) {
+          setAuthError('Email address is required.');
+          setAuthSubmitting(false);
+          return;
+        }
+        if (!password || password.trim().length < 6) {
+          setAuthError('Password must be at least 6 characters long.');
           setAuthSubmitting(false);
           return;
         }
         const res = await register({
-          name,
-          email,
-          organization,
-          phone,
-          password,
+          name: name.trim(),
+          email: email.trim(),
+          organization: organization.trim(),
+          phone: phone.trim(),
+          password: password.trim(),
         });
         if (!res.success) {
-          setAuthError(res.error || 'Registration failed.');
+          setAuthError(res.error || 'Registration failed. Please try again.');
         }
       }
     } catch (err: any) {
@@ -185,7 +297,7 @@ export default function ClientPortalPage() {
                 <div className="flex bg-slate-100 dark:bg-navy-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
-                    onClick={() => { setAuthMode('login'); setAuthError(null); }}
+                    onClick={() => handleSwitchMode('login')}
                     className={`flex-1 py-2 text-xs font-mono font-medium rounded-lg transition-all ${authMode === 'login'
                       ? 'bg-white dark:bg-cyan-950 text-cyan-600 dark:text-cyan-300 shadow-sm'
                       : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -195,7 +307,7 @@ export default function ClientPortalPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setAuthMode('register'); setAuthError(null); }}
+                    onClick={() => handleSwitchMode('register')}
                     className={`flex-1 py-2 text-xs font-mono font-medium rounded-lg transition-all ${authMode === 'register'
                       ? 'bg-white dark:bg-cyan-950 text-cyan-600 dark:text-cyan-300 shadow-sm'
                       : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -273,18 +385,116 @@ export default function ClientPortalPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">
-                      Password *
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder={authMode === 'login' ? 'Enter your account password' : 'Create a secure password'}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-                    />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-mono text-slate-700 dark:text-slate-300">
+                        Password *
+                      </label>
+                      {authMode === 'register' && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleGenerateNewPassword}
+                            className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 transition-colors"
+                            title="Generate a new strong password"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            <span>New Strong</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCopyPassword}
+                            className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors"
+                            title="Copy password to clipboard"
+                          >
+                            {copiedPassword ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-500" />
+                                <span className="text-emerald-500 font-bold">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder={authMode === 'login' ? 'Enter your account password' : 'Enter or use suggested strong password'}
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 font-mono tracking-wide"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {authMode === 'register' && (
+                      <div className="space-y-2 pt-1">
+                        {/* Suggested strong password callout */}
+                        <div className="p-2.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 flex items-start gap-2 text-[11px]">
+                          <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
+                          <div className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                            <span className="font-semibold text-cyan-700 dark:text-cyan-300">Strong Password Suggested:</span> We pre-filled a secure default password. You can keep it, click <strong>Copy</strong> to save it, or type your own.
+                          </div>
+                        </div>
+
+                        {/* Live strength meter */}
+                        {(() => {
+                          const strength = getPasswordStrength(password);
+                          return (
+                            <div className="space-y-1.5 p-2 rounded-lg bg-slate-100 dark:bg-navy-950 border border-slate-200 dark:border-slate-800">
+                              <div className="flex items-center justify-between text-[11px] font-mono">
+                                <span className="text-slate-500">Password Strength:</span>
+                                <span className={`font-bold ${
+                                  strength.score >= 4 ? 'text-emerald-500' :
+                                  strength.score === 3 ? 'text-cyan-500' :
+                                  strength.score === 2 ? 'text-amber-500' : 'text-red-500'
+                                }`}>
+                                  {strength.label}
+                                </span>
+                              </div>
+                              {/* Progress bar */}
+                              <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full transition-all duration-300 ${strength.color}`}
+                                  style={{ width: `${Math.min(100, Math.max(15, (strength.score / 4) * 100))}%` }}
+                                />
+                              </div>
+                              {/* Suggestions / Checklist */}
+                              <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-slate-500 pt-1">
+                                <span className={strength.hasLength ? 'text-emerald-500 font-semibold' : ''}>
+                                  {strength.hasLength ? '✓' : '○'} 8+ characters
+                                </span>
+                                <span className={strength.hasNumber ? 'text-emerald-500 font-semibold' : ''}>
+                                  {strength.hasNumber ? '✓' : '○'} Number (0-9)
+                                </span>
+                                <span className={strength.hasUpper && strength.hasLower ? 'text-emerald-500 font-semibold' : ''}>
+                                  {strength.hasUpper && strength.hasLower ? '✓' : '○'} Uppercase & Lowercase
+                                </span>
+                                <span className={strength.hasSpecial ? 'text-emerald-500 font-semibold' : ''}>
+                                  {strength.hasSpecial ? '✓' : '○'} Symbol (@#$!)
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
 
                   <button

@@ -11,8 +11,12 @@ CREATE TABLE IF NOT EXISTS public.users (
     role TEXT DEFAULT 'client', -- 'client' or 'admin'
     organization TEXT,
     phone TEXT,
+    password_hash TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure password_hash column exists if table was previously created
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 -- 2. Create the client project collaboration proposals table
 CREATE TABLE IF NOT EXISTS public.client_projects (

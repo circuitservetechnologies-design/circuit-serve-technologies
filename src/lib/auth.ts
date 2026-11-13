@@ -87,16 +87,24 @@ export async function registerClient(data: {
   // If Supabase is configured, also sync to Supabase table
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('users').insert([
-        {
-          id: newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-          organization: newUser.organization,
-          phone: newUser.phone,
-        }
-      ]);
+      const payload: any = {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        organization: newUser.organization,
+        phone: newUser.phone,
+        created_at: newUser.created_at,
+      };
+      if (newUser.password_hash) {
+        payload.password_hash = newUser.password_hash;
+      }
+      const { error } = await supabase.from('users').insert([payload]);
+      if (error) {
+        // Retry without password_hash in case Supabase table doesn't have that column
+        delete payload.password_hash;
+        await supabase.from('users').insert([payload]);
+      }
     } catch (err) {
       console.warn('Supabase user insert notice:', err);
     }
@@ -134,7 +142,21 @@ export async function loginUser(email: string, passOrPin: string): Promise<{ use
 
   // Check existing users in storage
   const users = getStoredUsers();
-  const found = users.find((u) => u.email.toLowerCase() === emailNorm);
+  let found = users.find((u) => u.email.toLowerCase() === emailNorm);
+
+  // If not found in local storage, check Supabase database if configured
+  if (!found && isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.from('users').select('*').eq('email', emailNorm).maybeSingle();
+      if (!error && data) {
+        found = data as User;
+        users.push(found);
+        saveStoredUsers(users);
+      }
+    } catch (e) {
+      console.warn('Supabase fetch user error:', e);
+    }
+  }
 
   if (!found) {
     // No account exists — do NOT auto-create. Force registration.
@@ -157,13 +179,28 @@ export function logoutUser() {
 }
 
 export async function getAllUsers(): Promise<User[]> {
+  const localUsers = getStoredUsers();
+
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase.from('users').select('*');
-      if (!error && data && data.length > 0) return data as User[];
+      const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+      if (!error && data) {
+        // Merge Supabase users with localUsers (deduplicate by email)
+        const userMap = new Map<string, User>();
+        (data as User[]).forEach((u) => {
+          if (u.email) userMap.set(u.email.toLowerCase(), u);
+        });
+        localUsers.forEach((u) => {
+          if (u.email && !userMap.has(u.email.toLowerCase())) {
+            userMap.set(u.email.toLowerCase(), u);
+          }
+        });
+        return Array.from(userMap.values());
+      }
     } catch (err) {
-      console.warn(err);
+      console.warn('Supabase getAllUsers warning:', err);
     }
   }
-  return getStoredUsers();
+
+  return localUsers;
 }

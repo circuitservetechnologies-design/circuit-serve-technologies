@@ -33,13 +33,23 @@ import {
   Eye,
   Sparkles,
   ArrowLeft,
+  ArrowRight,
   AlertCircle,
   Users,
   FolderKanban,
   CheckCircle2,
   Clock,
   Send,
-  Share2
+  Share2,
+  Search,
+  Phone,
+  Building2,
+  Calendar,
+  User as UserIcon,
+  RefreshCw,
+  MessageSquare,
+  Key,
+  X
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -54,6 +64,9 @@ export default function AdminPage() {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [copiedContactId, setCopiedContactId] = useState<string | null>(null);
 
   // Form State for Add / Edit Public Portfolio
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -881,56 +894,203 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
           </div>
         )}
 
-        {/* TAB 3: REGISTERED CLIENT ACCOUNTS */}
+        {/* TAB 3: REGISTERED CLIENT PROFILES */}
         {activeTab === 'users' && (
-          <div className="space-y-4">
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">
-              Registered Clients & Collaborators ({usersList.length})
-            </h3>
-
-            {usersList.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 space-y-2">
-                <Users className="w-10 h-10 text-slate-400 mx-auto" />
-                <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Users Registered Yet</h4>
-                <p className="text-xs text-slate-500">
-                  When visitors click "Collaborate / Client Portal" and create their own login, they appear here.
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                  <Users className="w-5 h-5 text-cyan-500" />
+                  <span>Registered Client Profiles & Collaborators ({usersList.length})</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  View complete client profiles, track their assigned hardware projects, and coordinate development.
                 </p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {usersList.map((u) => (
-                  <div
-                    key={u.id}
-                    className="p-4 rounded-xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-slate-900 dark:text-white text-sm">{u.name}</h4>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300">
-                        {u.role}
-                      </span>
-                    </div>
 
-                    <div className="text-xs font-mono space-y-0.5 text-slate-500">
-                      <div>Email: <span className="text-slate-800 dark:text-slate-200">{u.email}</span></div>
-                      {u.organization && <div>Org: <span className="text-slate-800 dark:text-slate-200">{u.organization}</span></div>}
-                      {u.phone && <div>Phone: <span className="text-slate-800 dark:text-slate-200">{u.phone}</span></div>}
-                    </div>
+              <div className="flex items-center gap-2.5">
+                {/* Supabase status indicator */}
+                <div className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border flex items-center gap-1.5 ${
+                  isSupabaseConfigured
+                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                    : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                  <span>{isSupabaseConfigured ? 'Supabase Database Connected' : 'Local Storage Mode'}</span>
+                </div>
 
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[11px] font-mono">
-                      <span className="text-slate-400">
-                        {clientProposals.filter((p) => p.user_id === u.id).length} Projects Submitted
-                      </span>
-                      <a
-                        href={`mailto:${u.email}`}
-                        className="text-cyan-600 dark:text-cyan-400 hover:underline"
-                      >
-                        Send Email →
-                      </a>
-                    </div>
-                  </div>
-                ))}
+                <button
+                  onClick={loadData}
+                  className="px-3 py-1.5 text-xs font-mono bg-slate-100 dark:bg-navy-950 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh</span>
+                </button>
               </div>
-            )}
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                placeholder="Search registered clients by name, email, organization, or phone..."
+                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+              />
+              {userSearchTerm && (
+                <button
+                  onClick={() => setUserSearchTerm('')}
+                  className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-mono"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* User Cards Grid */}
+            {(() => {
+              const filteredUsers = usersList.filter((u) => {
+                const term = userSearchTerm.toLowerCase();
+                return (
+                  u.name.toLowerCase().includes(term) ||
+                  u.email.toLowerCase().includes(term) ||
+                  (u.organization && u.organization.toLowerCase().includes(term)) ||
+                  (u.phone && u.phone.includes(term))
+                );
+              });
+
+              if (filteredUsers.length === 0) {
+                return (
+                  <div className="p-12 text-center rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <Users className="w-10 h-10 text-slate-400 mx-auto" />
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-white">
+                      {usersList.length === 0 ? 'No Users Registered Yet' : 'No Clients Match Your Search'}
+                    </h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      {usersList.length === 0
+                        ? 'When visitors register on the Collaboration Hub at /client, their profile appears here and syncs to Supabase.'
+                        : 'Try searching with a different name, email, or organization.'}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredUsers.map((u) => {
+                    const userProposals = clientProposals.filter((p) => p.user_id === u.id || p.user_email === u.email);
+                    const initials = u.name
+                      ? u.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+                      : 'CST';
+
+                    return (
+                      <div
+                        key={u.id}
+                        className="p-5 rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 space-y-4 hover:border-cyan-500/50 transition-all shadow-sm flex flex-col justify-between"
+                      >
+                        <div className="space-y-3">
+                          {/* Header with Avatar & Badge */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-sky-600 text-white font-mono font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                                {initials}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight">
+                                  {u.name}
+                                </h4>
+                                <span className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400">
+                                  {u.organization || 'Independent Engineer / Student'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800 uppercase shrink-0">
+                              {u.role}
+                            </span>
+                          </div>
+
+                          {/* Contact Details */}
+                          <div className="p-3 rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800/80 text-xs font-mono space-y-1.5">
+                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                              <span className="text-slate-400 flex items-center gap-1">
+                                <Mail className="w-3 h-3" /> Email:
+                              </span>
+                              <span className="text-slate-900 dark:text-slate-100 font-semibold truncate max-w-[170px]" title={u.email}>
+                                {u.email}
+                              </span>
+                            </div>
+
+                            {u.phone && (
+                              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                                <span className="text-slate-400 flex items-center gap-1">
+                                  <Phone className="w-3 h-3" /> Phone:
+                                </span>
+                                <span className="text-slate-900 dark:text-slate-100 font-semibold">
+                                  {u.phone}
+                                </span>
+                              </div>
+                            )}
+
+                            {u.created_at && (
+                              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                                <span className="text-slate-400 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" /> Joined:
+                                </span>
+                                <span className="text-slate-500">
+                                  {new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bottom Actions & Proposal Count */}
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between text-xs font-mono">
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              {userProposals.length} {userProposals.length === 1 ? 'Project Proposal' : 'Projects Submitted'}
+                            </span>
+
+                            <button
+                              onClick={() => setSelectedUser(u)}
+                              className="text-cyan-600 dark:text-cyan-400 hover:underline font-bold flex items-center gap-1"
+                            >
+                              <span>View Profile</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <a
+                              href={`mailto:${u.email}?subject=Regarding Your Circuit Serve Technologies Collaboration Account`}
+                              className="flex-1 py-1.5 text-center text-[11px] font-mono bg-slate-100 dark:bg-navy-950 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 text-slate-700 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors flex items-center justify-center gap-1"
+                            >
+                              <Mail className="w-3 h-3" />
+                              <span>Email</span>
+                            </a>
+
+                            {u.phone && (
+                              <a
+                                href={`https://wa.me/${u.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(u.name)},%20greetings%20from%20Circuit%20Serve%20Technologies%20engineering%20team.`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 py-1.5 text-center text-[11px] font-mono bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors flex items-center justify-center gap-1"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1092,6 +1252,278 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DETAILED CLIENT PROFILE MODAL */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-3xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-cyan-800/60 rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-cyan-500 to-sky-600 text-white font-mono font-bold text-base flex items-center justify-center shadow-md">
+                  {selectedUser.name
+                    ? selectedUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+                    : 'CST'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                      {selectedUser.name}
+                    </h3>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800 uppercase">
+                      {selectedUser.role}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-mono">
+                    {selectedUser.organization || 'Independent Client / Engineer'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6 text-xs">
+              {/* Profile Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800/80 space-y-1 font-mono">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Email Address</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-900 dark:text-slate-100 font-semibold">{selectedUser.email}</span>
+                    <a
+                      href={`mailto:${selectedUser.email}`}
+                      className="text-cyan-600 dark:text-cyan-400 hover:underline text-[11px]"
+                    >
+                      Compose →
+                    </a>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800/80 space-y-1 font-mono">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Mobile Phone</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-900 dark:text-slate-100 font-semibold">
+                      {selectedUser.phone || 'Not provided'}
+                    </span>
+                    {selectedUser.phone && (
+                      <a
+                        href={`https://wa.me/${selectedUser.phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-600 dark:text-emerald-400 hover:underline text-[11px]"
+                      >
+                        WhatsApp →
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800/80 space-y-1 font-mono">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Organization / College</span>
+                  <span className="text-slate-900 dark:text-slate-100 font-semibold block">
+                    {selectedUser.organization || 'None Listed'}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800/80 space-y-1 font-mono">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Account Created</span>
+                  <span className="text-slate-900 dark:text-slate-100 font-semibold block">
+                    {selectedUser.created_at
+                      ? new Date(selectedUser.created_at).toLocaleString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'Earlier Session'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Fast Communication Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <a
+                  href={`mailto:${selectedUser.email}?subject=Circuit%20Serve%20Technologies%20Hardware%20Collaboration`}
+                  className="px-4 py-2 text-xs font-mono bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800 rounded-lg flex items-center gap-1.5 transition-colors"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Send Direct Email</span>
+                </a>
+
+                {selectedUser.phone && (
+                  <a
+                    href={`https://wa.me/${selectedUser.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(selectedUser.name)},%20this%20is%20Circuit%20Serve%20Technologies.`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-lg flex items-center gap-1.5 transition-colors"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Open WhatsApp Chat</span>
+                  </a>
+                )}
+
+                <button
+                  onClick={() => {
+                    const card = `Client: ${selectedUser.name}\nEmail: ${selectedUser.email}\nPhone: ${selectedUser.phone || 'N/A'}\nOrg: ${selectedUser.organization || 'N/A'}`;
+                    navigator.clipboard.writeText(card);
+                    setCopiedContactId(selectedUser.id);
+                    setTimeout(() => setCopiedContactId(null), 2000);
+                  }}
+                  className="px-4 py-2 text-xs font-mono bg-slate-100 dark:bg-navy-950 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-colors"
+                >
+                  {copiedContactId === selectedUser.id ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-emerald-500 font-bold">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Client Card</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Submitted Projects by this User */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                    <FolderKanban className="w-4 h-4 text-cyan-500" />
+                    <span>Hardware Project Proposals by {selectedUser.name}</span>
+                  </h4>
+                  <span className="text-xs font-mono text-slate-500">
+                    {clientProposals.filter((p) => p.user_id === selectedUser.id || p.user_email === selectedUser.email).length} Total
+                  </span>
+                </div>
+
+                {(() => {
+                  const userProjects = clientProposals.filter(
+                    (p) => p.user_id === selectedUser.id || p.user_email === selectedUser.email
+                  );
+
+                  if (userProjects.length === 0) {
+                    return (
+                      <div className="p-8 text-center rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 text-slate-500">
+                        This client has registered their account but has not submitted any project requests yet.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {userProjects.map((cp) => (
+                        <div
+                          key={cp.id}
+                          className="p-4 rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 space-y-3"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300">
+                                {cp.category}
+                              </span>
+                              <h5 className="font-bold text-slate-900 dark:text-white text-sm mt-1">{cp.title}</h5>
+                            </div>
+
+                            {/* Status Changer */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-mono text-slate-400">Status:</span>
+                              <select
+                                value={cp.status}
+                                onChange={async (e) => {
+                                  await handleClientStatusChange(cp.id, e.target.value as any);
+                                }}
+                                className="px-2 py-1 text-xs font-mono rounded bg-white dark:bg-navy-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                              >
+                                <option value="Under Review">Under Review</option>
+                                <option value="Approved">Approved</option>
+                                <option value="In Development">In Development</option>
+                                <option value="Testing & Validation">Testing & Validation</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Declined">Declined</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-600 dark:text-slate-300">{cp.description}</p>
+
+                          {cp.specifications && (
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-700 dark:text-slate-300">
+                              <strong className="block text-slate-400 mb-0.5">Specifications:</strong>
+                              {cp.specifications}
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-[11px] font-mono text-slate-500">
+                            <div className="flex items-center gap-3">
+                              {cp.target_timeline && <span>Timeline: {cp.target_timeline}</span>}
+                              {cp.estimated_budget && <span>Budget: {cp.estimated_budget}</span>}
+                              {cp.reference_file_url && (
+                                <a
+                                  href={cp.reference_file_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
+                                >
+                                  <span>Schematic File</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleAddAdminNote(cp.id)}
+                                className="px-2.5 py-1 text-[11px] font-mono bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-cyan-500"
+                              >
+                                {cp.admin_notes ? 'Edit Note' : '+ Note'}
+                              </button>
+
+                              {!cp.is_published_to_portfolio ? (
+                                <button
+                                  onClick={() => {
+                                    setSelectedUser(null);
+                                    openPromoteModal(cp);
+                                  }}
+                                  className="px-2.5 py-1 text-[11px] font-mono font-bold text-white dark:text-navy-950 bg-gradient-to-r from-cyan-500 to-sky-500 rounded-lg hover:from-cyan-400 hover:to-sky-400"
+                                >
+                                  Promote to Public
+                                </button>
+                              ) : (
+                                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Live on Portfolio</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-navy-950 flex items-center justify-end rounded-b-2xl">
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="px-4 py-2 text-xs font-mono bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg transition-colors"
+              >
+                Close Profile
+              </button>
+            </div>
           </div>
         </div>
       )}
