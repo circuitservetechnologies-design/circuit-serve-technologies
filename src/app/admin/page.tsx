@@ -13,7 +13,8 @@ import {
   deleteClientProject,
   publishClientProjectToPublicPortfolio
 } from '@/lib/projectsStore';
-import { getAllUsers } from '@/lib/auth';
+import { getAllUsers, deleteUser } from '@/lib/auth';
+import { getMaintenanceStatus, setMaintenanceStatus } from '@/lib/maintenance';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { Project, Inquiry, ClientProject, User } from '@/types';
 import CSTLogo from '@/components/CSTLogo';
@@ -49,7 +50,8 @@ import {
   RefreshCw,
   MessageSquare,
   Key,
-  X
+  X,
+  Wrench
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -67,6 +69,8 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [copiedContactId, setCopiedContactId] = useState<string | null>(null);
+  const [isMaintenance, setIsMaintenance] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
 
   // Form State for Add / Edit Public Portfolio
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -115,20 +119,61 @@ export default function AdminPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [projs, proposals, inqs, users] = await Promise.all([
+      const [projs, proposals, inqs, users, maint] = await Promise.all([
         getProjects(),
         getClientProjects(),
         getInquiries(),
         getAllUsers(),
+        getMaintenanceStatus(),
       ]);
       setProjects(projs);
       setClientProposals(proposals);
       setInquiries(inqs);
       setUsersList(users);
+      setIsMaintenance(maint);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleMaintenance = async () => {
+    const nextState = !isMaintenance;
+    const confirmMsg = nextState
+      ? 'Put website into MAINTENANCE MODE?\n\nVisitors will see an "Under Maintenance" screen on all public pages.\n\nYou will continue to have full access to this Admin dashboard.'
+      : 'Turn OFF Maintenance Mode?\n\nThe public website will immediately be accessible to all visitors.';
+
+    if (!confirm(confirmMsg)) return;
+
+    setMaintenanceLoading(true);
+    try {
+      await setMaintenanceStatus(nextState);
+      setIsMaintenance(nextState);
+    } catch (err) {
+      console.error(err);
+      alert('Error updating maintenance mode.');
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userToDelete: User) => {
+    const confirmDelete = confirm(
+      `Are you sure you want to delete client account:\n\nName: ${userToDelete.name}\nEmail: ${userToDelete.email}\n\nThis will remove the user profile from Supabase and local storage.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await deleteUser(userToDelete.id);
+      if (selectedUser?.id === userToDelete.id) {
+        setSelectedUser(null);
+      }
+      await loadData();
+      alert(`User account for "${userToDelete.name}" has been deleted.`);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete user.');
     }
   };
 
@@ -445,6 +490,21 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
             <span>Public Portfolio</span>
           </Link>
 
+          {/* Maintenance Mode Toggle Button */}
+          <button
+            onClick={handleToggleMaintenance}
+            disabled={maintenanceLoading}
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg border flex items-center gap-1.5 transition-all shadow-sm ${
+              isMaintenance
+                ? 'bg-amber-500/20 text-amber-500 border-amber-500/60 hover:bg-amber-500/30 animate-pulse'
+                : 'bg-slate-100 dark:bg-navy-950 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800 hover:border-amber-500'
+            }`}
+            title="Toggle Website Under Maintenance Mode"
+          >
+            <Wrench className={`w-3.5 h-3.5 ${isMaintenance ? 'text-amber-500' : 'text-slate-400'}`} />
+            <span>{isMaintenance ? 'Maintenance: ON' : 'Set Maintenance'}</span>
+          </button>
+
           <button
             onClick={handleLogout}
             className="px-3 py-1.5 text-xs font-mono text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800/60 rounded-lg"
@@ -453,6 +513,26 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
           </button>
         </div>
       </header>
+
+      {/* Maintenance Mode Alert Banner if active */}
+      {isMaintenance && (
+        <div className="bg-gradient-to-r from-amber-500/20 via-amber-600/25 to-orange-500/20 border-b border-amber-500/50 px-4 sm:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono backdrop-blur-md">
+          <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-300">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0" />
+            <span>
+              <strong>MAINTENANCE MODE IS CURRENTLY ACTIVE:</strong> Visitors visiting your website will see the "Under Maintenance" screen. Only Admin can access this dashboard.
+            </span>
+          </div>
+
+          <button
+            onClick={handleToggleMaintenance}
+            disabled={maintenanceLoading}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold transition-colors shrink-0 shadow-sm"
+          >
+            Turn Off Maintenance Mode
+          </button>
+        </div>
+      )}
 
       {/* Main Body */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -1083,6 +1163,14 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                                 <span>WhatsApp</span>
                               </a>
                             )}
+
+                            <button
+                              onClick={() => handleDeleteUser(u)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-100 dark:bg-navy-950 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors shrink-0"
+                              title={`Delete ${u.name}'s account`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1516,7 +1604,15 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-navy-950 flex items-center justify-end rounded-b-2xl">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-navy-950 flex items-center justify-between rounded-b-2xl">
+              <button
+                onClick={() => handleDeleteUser(selectedUser)}
+                className="px-3.5 py-2 text-xs font-mono text-red-600 dark:text-red-400 hover:text-white hover:bg-red-600 dark:hover:bg-red-600 border border-red-300 dark:border-red-800 rounded-lg transition-colors flex items-center gap-1.5 font-semibold"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete User Account</span>
+              </button>
+
               <button
                 onClick={() => setSelectedUser(null)}
                 className="px-4 py-2 text-xs font-mono bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg transition-colors"

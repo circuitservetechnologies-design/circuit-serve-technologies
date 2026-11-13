@@ -3,6 +3,7 @@ import './globals.css';
 import { COMPANY_INFO } from '@/lib/constants';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { AuthProvider } from '@/components/AuthContext';
+import MaintenanceGuard from '@/components/MaintenanceGuard';
 
 export const metadata: Metadata = {
   title: 'Circuit Serve Technologies | Concept to Hardware & Silicon Solutions',
@@ -42,7 +43,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-cyan-500 selection:text-white dark:selection:text-navy-950 transition-colors duration-300">
         <ThemeProvider>
           <AuthProvider>
-            {children}
+            <MaintenanceGuard>
+              {children}
+            </MaintenanceGuard>
           </AuthProvider>
         </ThemeProvider>
       </body>

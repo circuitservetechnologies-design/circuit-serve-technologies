@@ -82,10 +82,18 @@ CREATE TABLE IF NOT EXISTS public.inquiries (
 CREATE INDEX IF NOT EXISTS idx_inquiries_created_at ON public.inquiries(created_at DESC);
 
 -- 5. Enable Row Level Security (RLS)
+-- 5. Create site settings table (for maintenance mode, etc.)
+CREATE TABLE IF NOT EXISTS public.site_settings (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 
 -- 6. Access Policies
 DROP POLICY IF EXISTS "Enable all for users" ON public.users;
@@ -105,3 +113,6 @@ CREATE POLICY "Anyone can submit inquiry" ON public.inquiries FOR INSERT WITH CH
 
 DROP POLICY IF EXISTS "Enable read and manage for inquiries" ON public.inquiries;
 CREATE POLICY "Enable read and manage for inquiries" ON public.inquiries FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Enable all for site_settings" ON public.site_settings;
+CREATE POLICY "Enable all for site_settings" ON public.site_settings FOR ALL USING (true) WITH CHECK (true);

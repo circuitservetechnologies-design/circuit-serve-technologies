@@ -204,3 +204,28 @@ export async function getAllUsers(): Promise<User[]> {
 
   return localUsers;
 }
+
+export async function deleteUser(userId: string): Promise<{ success: boolean; error?: string }> {
+  // 1. Delete from Supabase if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase.from('users').delete().eq('id', userId);
+      if (error) console.warn('Supabase delete user notice:', error);
+    } catch (err) {
+      console.warn('Supabase delete error:', err);
+    }
+  }
+
+  // 2. Delete from local storage
+  const users = getStoredUsers();
+  const filtered = users.filter((u) => u.id !== userId);
+  saveStoredUsers(filtered);
+
+  // If current session is this user, clear session
+  const current = getCurrentUser();
+  if (current && current.id === userId) {
+    setCurrentUser(null);
+  }
+
+  return { success: true };
+}
