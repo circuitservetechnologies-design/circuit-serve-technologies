@@ -163,7 +163,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         </div>
       </main>
 
-      {/* Footer with Discreet Admin Doorway */}
+      {/* Footer */}
       <footer className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 text-center border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-600">
         <div className="flex items-center gap-1.5">
           <MapPin className="w-3.5 h-3.5 text-cyan-500/70" />
@@ -172,18 +172,6 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
 
         <div>
           <span>Circuit Serve Technologies © {new Date().getFullYear()}</span>
-        </div>
-
-        {/* Discreet doorway to /admin so admin is never locked out */}
-        <div>
-          <Link
-            href="/admin"
-            className="text-[11px] text-slate-700 hover:text-slate-400 transition-colors flex items-center gap-1"
-            title="Administrator Portal"
-          >
-            <Lock className="w-3 h-3" />
-            <span>Admin Gateway</span>
-          </Link>
         </div>
       </footer>
     </div>

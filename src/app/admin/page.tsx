@@ -101,13 +101,22 @@ export default function AdminPage() {
     client_name: '',
   });
 
-  // Check auth session
-  useEffect(() => {
-    const sessionAuth = sessionStorage.getItem('cst_admin_auth');
-    if (sessionAuth === 'true') {
+  // Auth session check: PIN is always required for fresh visits to protect Admin authority
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const expectedPin = process.env.NEXT_PUBLIC_ADMIN_PIN || 'CST@2026';
+    if (pin.trim() === expectedPin.trim() || pin.trim() === 'CST@2026') {
       setIsAuthenticated(true);
+      setAuthError(false);
+    } else {
+      setAuthError(true);
     }
-  }, []);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setPin('');
+  };
 
   // Fetch data when authenticated
   useEffect(() => {
@@ -177,23 +186,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const expectedPin = process.env.NEXT_PUBLIC_ADMIN_PIN || 'CST@2026';
-    if (pin.trim() === expectedPin.trim() || pin.trim() === 'CST@2026') {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('cst_admin_auth', 'true');
-      setAuthError(false);
-    } else {
-      setAuthError(true);
-    }
-  };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('cst_admin_auth');
-    setPin('');
-  };
 
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
