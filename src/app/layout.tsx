@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   title: 'Circuit Serve Technologies | Concept to Hardware & Silicon Solutions',
   description:
     'Circuit Serve Technologies (CST) provides end-to-end electronics product development solutions: high-speed PCB design, embedded systems, IoT devices, hardware prototyping, testing & validation, manufacturing support, and ASIC semiconductor design in Surampalem, Andhra Pradesh.',
+  icons: {
+    icon: '/cst-logo.jpg',
+    apple: '/cst-logo.jpg',
+  },
   keywords: [
     'Circuit Serve Technologies',
     'CST Surampalem',
@@ -38,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark scroll-smooth" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/cst-logo.jpg" type="image/jpeg" />
       </head>
       <body className="min-h-screen bg-slate-50 dark:bg-navy-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-cyan-500 selection:text-white dark:selection:text-navy-950 transition-colors duration-300">
         <ThemeProvider>

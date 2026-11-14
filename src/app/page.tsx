@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ContactForm from '@/components/ContactForm';
@@ -30,7 +31,9 @@ import {
   Globe, 
   Sparkles, 
   ExternalLink,
-  FolderKanban
+  FolderKanban,
+  Download,
+  ZoomIn
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -493,6 +496,106 @@ export default function HomePage() {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+
+        {/* ====================================================================
+            BROCHURE SECTION
+        ==================================================================== */}
+        <section id="brochure" className="py-24 bg-white dark:bg-navy-950 border-t border-slate-200 dark:border-slate-800/80 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none" />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+
+            {/* Section header */}
+            <div className="text-center mb-14 space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-100 dark:bg-cyan-950/80 border border-cyan-300 dark:border-cyan-800/60 text-cyan-800 dark:text-cyan-300 text-xs font-mono">
+                <FileText className="w-3.5 h-3.5" />
+                <span>OFFICIAL COMPANY BROCHURE</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Everything About <span className="text-cyan-500">Circuit Serve</span> — At a Glance
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
+                Our official company brochure covers capabilities, services, roadmap, and what makes Circuit Serve Technologies the right engineering partner for your project.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+
+              {/* Brochure preview */}
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/30 to-sky-500/30 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition-all duration-500" />
+                <div className="relative rounded-2xl overflow-hidden border-2 border-cyan-500/30 dark:border-cyan-700/40 shadow-2xl shadow-cyan-500/10">
+                  <a
+                    href="/circuit-serve-brochure.jpg"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Click to view full brochure"
+                  >
+                    <Image
+                      src="/circuit-serve-brochure.jpg"
+                      alt="Circuit Serve Technologies Official Company Brochure"
+                      width={700}
+                      height={990}
+                      className="w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                      priority
+                    />
+                    {/* Overlay on hover */}
+                    <div className="absolute inset-0 bg-cyan-900/0 group-hover:bg-cyan-900/30 flex items-center justify-center transition-all duration-300">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 dark:bg-navy-900/90 backdrop-blur-sm px-5 py-3 rounded-xl flex items-center gap-2 text-sm font-mono font-bold text-cyan-700 dark:text-cyan-300 shadow-xl border border-cyan-300 dark:border-cyan-700">
+                        <ZoomIn className="w-4 h-4" />
+                        <span>View Full Brochure</span>
+                      </div>
+                    </div>
+                  </a>
+                </div>
+              </div>
+
+              {/* Info + Download */}
+              <div className="space-y-8">
+                <div className="space-y-5">
+                  {[
+                    { title: 'Core Capabilities', desc: 'PCB Design, Embedded Systems, IoT Products, Rapid Prototyping, Testing & Validation, Manufacturing Support.' },
+                    { title: 'Who We Serve', desc: 'Universities, R&D Labs, SMEs, Tech Startups, Government & Defence, Global Hardware Partners.' },
+                    { title: 'Why Choose Circuit Serve?', desc: 'End-to-end execution, Quality & Reliability, Made in India with global standards, Rapid time-to-market.' },
+                    { title: 'Future Roadmap', desc: 'Phase 1: B.E./B.Tech mastery → Phase 2: Advanced FPGA & Logic → Phase 3: RTL-to-GDSII ASIC Design.' },
+                  ].map((item) => (
+                    <div key={item.title} className="flex items-start gap-3.5">
+                      <div className="w-2 h-2 rounded-full bg-cyan-500 mt-2 shrink-0 animate-pulse" />
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white font-mono">{item.title}</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <a
+                    href="/circuit-serve-brochure.jpg"
+                    download="Circuit-Serve-Technologies-Brochure.jpg"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-sky-500 text-white dark:text-navy-950 font-bold text-xs font-mono rounded-xl hover:from-cyan-400 hover:to-sky-400 transition-all shadow-lg shadow-cyan-500/25 active:scale-95"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Brochure</span>
+                  </a>
+                  <a
+                    href="/circuit-serve-brochure.jpg"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-cyan-500/50 text-cyan-700 dark:text-cyan-300 font-bold text-xs font-mono rounded-xl hover:bg-cyan-50 dark:hover:bg-cyan-950/60 transition-all"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                    <span>View Full Screen</span>
+                  </a>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed">
+                  📍 Surampalem, Andhra Pradesh · 📞 +91 8985043496 · 🌐 circuitservetechnologies.vercel.app
+                </div>
+              </div>
+
+            </div>
           </div>
         </section>
 

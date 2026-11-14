@@ -33,6 +33,7 @@ export default function Navbar() {
     { name: 'Capabilities', href: '/#capabilities' },
     { name: 'Who We Serve', href: '/#who-we-serve' },
     { name: 'Roadmap', href: '/#roadmap' },
+    { name: 'Brochure', href: '/#brochure' },
     { name: 'Projects', href: '/projects' },
     { name: 'Collaborate', href: '/client' },
     { name: 'Contact', href: '/#contact' },
