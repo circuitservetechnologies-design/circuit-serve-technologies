@@ -97,6 +97,8 @@ export default function AdminPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [feedbackViewingProject, setFeedbackViewingProject] = useState<Project | null>(null);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
 
   // Modal to promote client project to public showcase
   const [promotingProject, setPromotingProject] = useState<ClientProject | null>(null);
@@ -349,6 +351,8 @@ export default function AdminPage() {
 
   const handleEditProject = (p: Project) => {
     setEditingId(p.id);
+    setClientSearchTerm('');
+    setIsClientDropdownOpen(false);
     setFormData({
       title: p.title || '',
       category: p.category || 'PCB Design & Layout',
@@ -374,6 +378,8 @@ export default function AdminPage() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    setClientSearchTerm('');
+    setIsClientDropdownOpen(false);
     setFormData({
       title: '',
       category: 'PCB Design & Layout',
@@ -464,6 +470,9 @@ export default function AdminPage() {
       assigned_client_email: '',
       assigned_client_name: '',
     });
+
+    setClientSearchTerm('');
+    setIsClientDropdownOpen(false);
 
     await loadData();
     setTimeout(() => setFormSuccess(null), 4000);
@@ -1092,47 +1101,205 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   </div>
                 </div>
 
-                {/* ASSIGN REGISTERED CLIENT FOR REVIEW & FEEDBACK */}
-                <div className="p-3 rounded-xl bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 space-y-2">
-                  <label className="block font-mono text-slate-800 dark:text-slate-200 font-semibold flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
+                {/* ASSIGN REGISTERED CLIENT FOR REVIEW & FEEDBACK (WITH SEARCH OPTION) */}
+                <div className="p-3.5 rounded-xl bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-mono text-slate-800 dark:text-slate-200 font-semibold flex items-center gap-1.5 text-xs">
                       <UserIcon className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
                       <span>Assign Client for Review & Feedback</span>
-                    </span>
+                    </label>
                     <span className="text-[10px] text-cyan-700 dark:text-cyan-300 font-normal">
                       Only this client can review
                     </span>
-                  </label>
-                  <select
-                    value={formData.assigned_client_email}
-                    onChange={(e) => {
-                      const selectedEmail = e.target.value;
-                      const clientObj = usersList.find((u) => u.email.toLowerCase() === selectedEmail.toLowerCase());
-                      setFormData({
-                        ...formData,
-                        assigned_client_email: selectedEmail,
-                        assigned_client_name: clientObj ? clientObj.name : '',
-                        client: formData.client || (clientObj ? clientObj.organization || clientObj.name : ''),
-                      });
-                    }}
-                    className="w-full px-3 py-2 bg-white dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 text-xs font-mono"
-                  >
-                    <option value="">-- No Assigned Client (Public Showcase Project) --</option>
-                    {usersList.map((u) => (
-                      <option key={u.id} value={u.email}>
-                        {u.name} ({u.email}) {u.organization ? `— ${u.organization}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  </div>
+
+                  {/* 1. If a client is currently assigned */}
                   {formData.assigned_client_email ? (
-                    <p className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>Client <strong>{formData.assigned_client_name || formData.assigned_client_email}</strong> will be the exclusive reviewer on their Client Portal.</span>
-                    </p>
-                  ) : (
-                    <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                      Select a registered client from the dropdown so they can review specs, provide feedback, and give sign-off on their collaboration portal.
-                    </p>
+                    <div className="p-3 bg-white dark:bg-navy-900 border border-emerald-300 dark:border-emerald-800/80 rounded-xl space-y-2 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0 font-mono">
+                            {(formData.assigned_client_name || formData.assigned_client_email).slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                                {formData.assigned_client_name || 'Assigned Client'}
+                              </span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold">
+                                ✓ Assigned Reviewer
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-mono text-slate-500 truncate">
+                              {formData.assigned_client_email}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsClientDropdownOpen(true);
+                              setClientSearchTerm('');
+                            }}
+                            className="px-2 py-1 text-[11px] font-mono font-medium text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 border border-cyan-200 dark:border-cyan-800 rounded-md transition-colors"
+                          >
+                            Change
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                assigned_client_email: '',
+                                assigned_client_name: '',
+                              });
+                              setClientSearchTerm('');
+                              setIsClientDropdownOpen(false);
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-500 rounded-md transition-colors"
+                            title="Unassign client (make public)"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 shrink-0" />
+                        <span>This client has private review and sign-off access on their Client Portal.</span>
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* 2. Client Search & Selection Box */}
+                  {(!formData.assigned_client_email || isClientDropdownOpen) && (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          value={clientSearchTerm}
+                          onChange={(e) => {
+                            setClientSearchTerm(e.target.value);
+                            setIsClientDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsClientDropdownOpen(true)}
+                          placeholder="Search clients by name, email, or company..."
+                          className="w-full pl-9 pr-8 py-2 bg-white dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                        />
+                        {clientSearchTerm && (
+                          <button
+                            type="button"
+                            onClick={() => setClientSearchTerm('')}
+                            className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-mono"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Dropdown list of matching clients */}
+                      <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-navy-950 shadow-md divide-y divide-slate-100 dark:divide-slate-800/80">
+                        {/* Option: No Assigned Client */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              assigned_client_email: '',
+                              assigned_client_name: '',
+                            });
+                            setIsClientDropdownOpen(false);
+                            setClientSearchTerm('');
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-900 text-xs font-mono text-slate-500 flex items-center justify-between"
+                        >
+                          <span>-- No Assigned Client (Public Showcase Project) --</span>
+                          {!formData.assigned_client_email && <Check className="w-3.5 h-3.5 text-cyan-500" />}
+                        </button>
+
+                        {(() => {
+                          const term = clientSearchTerm.trim().toLowerCase();
+                          const matches = usersList.filter((u) => {
+                            if (!term) return true;
+                            return (
+                              u.name?.toLowerCase().includes(term) ||
+                              u.email?.toLowerCase().includes(term) ||
+                              (u.organization && u.organization.toLowerCase().includes(term)) ||
+                              (u.phone && u.phone.includes(term))
+                            );
+                          });
+
+                          if (matches.length === 0) {
+                            return (
+                              <div className="p-3 text-center text-xs font-mono text-slate-400">
+                                No clients found matching "{clientSearchTerm}".
+                              </div>
+                            );
+                          }
+
+                          return matches.map((u) => {
+                            const isSelected =
+                              formData.assigned_client_email?.toLowerCase() === u.email.toLowerCase();
+
+                            return (
+                              <button
+                                type="button"
+                                key={u.id}
+                                onClick={() => {
+                                  setFormData({
+                                    ...formData,
+                                    assigned_client_email: u.email,
+                                    assigned_client_name: u.name,
+                                    client: formData.client || u.organization || u.name,
+                                  });
+                                  setIsClientDropdownOpen(false);
+                                  setClientSearchTerm('');
+                                }}
+                                className={`w-full text-left px-3 py-2 hover:bg-cyan-50/60 dark:hover:bg-cyan-950/40 transition-colors flex items-center justify-between gap-2 ${
+                                  isSelected
+                                    ? 'bg-cyan-50 dark:bg-cyan-950/80 border-l-2 border-cyan-500'
+                                    : ''
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-xs text-slate-900 dark:text-white font-mono truncate">
+                                      {u.name}
+                                    </span>
+                                    {u.organization && (
+                                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-navy-900 text-slate-600 dark:text-slate-400 truncate">
+                                        {u.organization}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] font-mono text-slate-500 truncate">
+                                    {u.email}
+                                  </p>
+                                </div>
+
+                                {isSelected && <Check className="w-4 h-4 text-cyan-500 shrink-0" />}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 px-1 pt-0.5">
+                        <span>{usersList.length} registered client profiles</span>
+                        {formData.assigned_client_email && isClientDropdownOpen && (
+                          <button
+                            type="button"
+                            onClick={() => setIsClientDropdownOpen(false)}
+                            className="text-cyan-600 dark:text-cyan-400 hover:underline"
+                          >
+                            Done selecting
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
 
