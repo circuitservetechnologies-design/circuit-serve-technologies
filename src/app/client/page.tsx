@@ -127,6 +127,8 @@ export default function ClientPortalPage() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+  const [forgotSmsSent, setForgotSmsSent] = useState(false);
+  const [forgotMaskedPhone, setForgotMaskedPhone] = useState<string | null>(null);
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,16 +136,33 @@ export default function ClientPortalPage() {
 
     setForgotLoading(true);
     setForgotError(null);
+    setForgotSmsSent(false);
+    setForgotMaskedPhone(null);
 
     try {
+      // Look up phone from local storage for the given email (server also checks Supabase)
+      let localPhone: string | undefined;
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('cst_users_v1');
+          if (raw) {
+            const users = JSON.parse(raw);
+            const found = users.find((u: any) => u.email?.toLowerCase() === forgotEmail.trim().toLowerCase());
+            if (found?.phone) localPhone = found.phone;
+          }
+        } catch {}
+      }
+
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail.trim() }),
+        body: JSON.stringify({ email: forgotEmail.trim(), phone: localPhone }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
+        setForgotSmsSent(!!data.smsSent);
+        setForgotMaskedPhone(data.maskedPhone || null);
         setForgotStep('verify_otp');
       } else {
         setForgotError(data.error || 'Failed to dispatch verification code.');
@@ -213,6 +232,8 @@ export default function ClientPortalPage() {
           setForgotNewPass('');
           setForgotConfirmPass('');
           setForgotSuccess(null);
+          setForgotSmsSent(false);
+          setForgotMaskedPhone(null);
           setEmail(forgotEmail);
           setAuthMode('login');
         }, 2200);
@@ -1001,6 +1022,8 @@ export default function ClientPortalPage() {
                   setShowForgotPasswordModal(false);
                   setForgotError(null);
                   setForgotSuccess(null);
+                  setForgotSmsSent(false);
+                  setForgotMaskedPhone(null);
                 }}
                 className="text-xs font-mono text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
               >
@@ -1029,7 +1052,7 @@ export default function ClientPortalPage() {
               /* STEP 1: Enter Email to Receive OTP */
               <form onSubmit={handleRequestOtp} className="space-y-4">
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-mono">
-                  To protect your account against unauthorized changes, a <strong>6-digit security code (OTP)</strong> will be dispatched to your registered email address.
+                  To protect your account against unauthorized changes, a <strong>6-digit security code (OTP)</strong> will be dispatched to your registered email address and phone number (SMS) if available.
                 </p>
 
                 <div>
@@ -1083,7 +1106,11 @@ export default function ClientPortalPage() {
                 <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-xs font-mono text-cyan-600 dark:text-cyan-400 flex items-start gap-2">
                   <Mail className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    A 6-digit OTP code has been dispatched to <strong>{forgotEmail}</strong>. Check your inbox (and spam folder). Valid for 10 minutes.
+                    A 6-digit OTP code has been dispatched to <strong>{forgotEmail}</strong>.
+                    {forgotSmsSent && forgotMaskedPhone && (
+                      <> Also sent via SMS to <strong>{forgotMaskedPhone}</strong>.</>
+                    )}
+                    {' '}Check your inbox (and spam folder). Valid for 10 minutes.
                   </span>
                 </div>
 
