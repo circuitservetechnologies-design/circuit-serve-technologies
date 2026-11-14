@@ -416,7 +416,7 @@ export default function AdminPage() {
       .filter(Boolean);
 
     if (editingId) {
-      await updateProject(editingId, {
+      const res = await updateProject(editingId, {
         title: formData.title,
         category: formData.category,
         summary: formData.summary,
@@ -432,7 +432,26 @@ export default function AdminPage() {
         assigned_client_email: formData.assigned_client_email,
         assigned_client_name: formData.assigned_client_name,
       });
-      setFormSuccess('Project updated successfully!');
+      if (!res) {
+        // If project wasn't found (e.g. deleted), add it freshly
+        await addProject({
+          title: formData.title,
+          category: formData.category,
+          summary: formData.summary,
+          description: formData.description,
+          client: formData.client,
+          technologies: techArray,
+          features: featuresArray,
+          image_url: formData.image_url,
+          status: formData.status,
+          featured: formData.featured,
+          completion_date: formData.completion_date,
+          demo_url: formData.demo_url,
+          assigned_client_email: formData.assigned_client_email,
+          assigned_client_name: formData.assigned_client_name,
+        });
+      }
+      setFormSuccess('Project saved successfully!');
       setEditingId(null);
     } else {
       await addProject({
@@ -519,6 +538,8 @@ export default function AdminPage() {
       status: 'Completed',
       featured: true,
       completion_date: new Date().getFullYear().toString(),
+      assigned_client_email: promotingProject.user_email,
+      assigned_client_name: promotingProject.user_name,
     });
 
     setPromotingProject(null);
@@ -979,10 +1000,19 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
 
                       <div className="flex items-center gap-2">
                         {cp.is_published_to_portfolio ? (
-                          <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Live on Portfolio</span>
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Live on Portfolio</span>
+                            </span>
+                            <button
+                              onClick={() => openPromoteModal(cp)}
+                              className="px-2.5 py-1 text-xs font-mono font-medium text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-300 dark:border-cyan-800 rounded-lg transition-colors"
+                              title="Re-publish to public showcase"
+                            >
+                              Re-publish
+                            </button>
+                          </div>
                         ) : (
                           <button
                             onClick={() => openPromoteModal(cp)}
@@ -1022,15 +1052,28 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   {editingId ? <Edit3 className="w-4 h-4 text-cyan-500" /> : <Plus className="w-4 h-4 text-cyan-500" />}
                   <span>{editingId ? 'Edit Project Details' : 'Direct Project Upload'}</span>
                 </h3>
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="text-xs font-mono text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 transition-colors"
-                  >
-                    Cancel Edit
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {editingId ? (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 px-2.5 py-1 rounded-md bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-300 dark:border-cyan-800 transition-colors flex items-center gap-1 font-bold"
+                      title="Switch back to creating a new project"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Project</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="text-xs font-mono text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 transition-colors"
+                      title="Clear form inputs"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
 
               {editingId && (
@@ -1562,7 +1605,15 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                           onClick={async () => {
                             if (confirm(`Delete project "${p.title}"?`)) {
                               await deleteProject(p.id);
+                              // Reset edit form if we were editing this project
                               if (editingId === p.id) handleCancelEdit();
+                              // Also reset is_published_to_portfolio on any client proposal linked by title
+                              const linkedProposal = clientProposals.find(
+                                (cp) => cp.is_published_to_portfolio && cp.title === p.title
+                              );
+                              if (linkedProposal) {
+                                await updateClientProject(linkedProposal.id, { is_published_to_portfolio: false });
+                              }
                               await loadData();
                             }
                           }}
@@ -2219,10 +2270,21 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
                                   Promote to Public
                                 </button>
                               ) : (
-                                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Live on Portfolio</span>
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Live</span>
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUser(null);
+                                      openPromoteModal(cp);
+                                    }}
+                                    className="px-2 py-0.5 text-[10px] font-mono text-cyan-600 dark:text-cyan-400 hover:underline border border-cyan-500/30 rounded"
+                                  >
+                                    Re-publish
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>

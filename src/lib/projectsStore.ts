@@ -5,8 +5,77 @@ const LOCAL_STORAGE_KEY_PROJECTS = 'cst_projects_store_v1';
 const LOCAL_STORAGE_KEY_INQUIRIES = 'cst_inquiries_store_v1';
 const LOCAL_STORAGE_KEY_CLIENT_PROJECTS = 'cst_client_projects_v1';
 
+// Internal tags to persist client review assignments and feedbacks inside Supabase features column
+// even when ALTER TABLE migration columns haven't been created yet in the database.
+const TAG_ASSIGNED_EMAIL = '__CST_ASSIGNED_EMAIL__:';
+const TAG_ASSIGNED_NAME = '__CST_ASSIGNED_NAME__:';
+const TAG_FEEDBACKS = '__CST_FEEDBACKS__:';
+
+function packFeatures(
+  features?: string[],
+  assignedEmail?: string,
+  assignedName?: string,
+  feedbacks?: ProjectFeedback[]
+): string[] {
+  const clean = (features || []).filter(
+    (f) =>
+      typeof f === 'string' &&
+      !f.startsWith(TAG_ASSIGNED_EMAIL) &&
+      !f.startsWith(TAG_ASSIGNED_NAME) &&
+      !f.startsWith(TAG_FEEDBACKS)
+  );
+  if (assignedEmail && assignedEmail.trim()) {
+    clean.push(`${TAG_ASSIGNED_EMAIL}${assignedEmail.trim().toLowerCase()}`);
+  }
+  if (assignedName && assignedName.trim()) {
+    clean.push(`${TAG_ASSIGNED_NAME}${assignedName.trim()}`);
+  }
+  if (feedbacks && feedbacks.length > 0) {
+    clean.push(`${TAG_FEEDBACKS}${JSON.stringify(feedbacks)}`);
+  }
+  return clean;
+}
+
+function unpackProject(p: any): Project {
+  let email = p.assigned_client_email;
+  let name = p.assigned_client_name;
+  let feedbacks = p.feedbacks || [];
+  const rawFeatures: string[] = Array.isArray(p.features) ? p.features : [];
+  const cleanFeatures: string[] = [];
+
+  for (const item of rawFeatures) {
+    if (typeof item === 'string') {
+      if (item.startsWith(TAG_ASSIGNED_EMAIL)) {
+        if (!email) email = item.substring(TAG_ASSIGNED_EMAIL.length).trim();
+      } else if (item.startsWith(TAG_ASSIGNED_NAME)) {
+        if (!name) name = item.substring(TAG_ASSIGNED_NAME.length).trim();
+      } else if (item.startsWith(TAG_FEEDBACKS)) {
+        if (!feedbacks || feedbacks.length === 0) {
+          try {
+            feedbacks = JSON.parse(item.substring(TAG_FEEDBACKS.length));
+          } catch (e) {
+            // ignore
+          }
+        }
+      } else {
+        cleanFeatures.push(item);
+      }
+    }
+  }
+
+  return {
+    ...p,
+    features: cleanFeatures,
+    assigned_client_email: email || undefined,
+    assigned_client_name: name || undefined,
+    feedbacks: Array.isArray(feedbacks) ? feedbacks : [],
+  };
+}
+
 // Initial state is strictly empty as requested: "don't give any demo projects in project section"
 export async function getProjects(): Promise<Project[]> {
+  let results: Project[] = [];
+
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase
@@ -16,30 +85,54 @@ export async function getProjects(): Promise<Project[]> {
 
       if (error) {
         console.warn('Error fetching from Supabase, falling back to local storage:', error.message);
-      } else if (data) {
-        return data as Project[];
+      } else if (data && data.length > 0) {
+        results = data.map(unpackProject);
       }
     } catch (err) {
       console.error('Supabase query failed:', err);
     }
   }
 
-  // Fallback to localStorage in browser environment
+  // Fallback / merge with localStorage in browser environment
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY_PROJECTS);
       if (stored) {
-        return JSON.parse(stored) as Project[];
+        const localProjects = (JSON.parse(stored) as any[]).map(unpackProject);
+        if (results.length === 0) {
+          results = localProjects;
+        } else {
+          // If Supabase returned results, merge any client assignment or feedback from local storage if missing in Supabase
+          results = results.map((remote) => {
+            const match = localProjects.find((lp) => lp.id === remote.id || lp.title === remote.title);
+            if (match) {
+              return {
+                ...remote,
+                assigned_client_email: remote.assigned_client_email || match.assigned_client_email,
+                assigned_client_name: remote.assigned_client_name || match.assigned_client_name,
+                feedbacks: (remote.feedbacks && remote.feedbacks.length > 0) ? remote.feedbacks : (match.feedbacks || []),
+              };
+            }
+            return remote;
+          });
+        }
       }
     } catch (e) {
       console.error('Local storage read error:', e);
     }
   }
 
-  return [];
+  return results;
 }
 
 export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
+  const packedFeatures = packFeatures(
+    project.features,
+    project.assigned_client_email,
+    project.assigned_client_name,
+    project.feedbacks
+  );
+
   const newProject: Project = {
     ...project,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `proj_${Date.now()}`,
@@ -47,6 +140,8 @@ export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'u
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+
+  let savedProject = newProject;
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -58,7 +153,7 @@ export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'u
         description: newProject.description,
         client: newProject.client,
         technologies: newProject.technologies,
-        features: newProject.features,
+        features: packedFeatures, // Packed with metadata tags for fallback
         image_url: newProject.image_url,
         status: newProject.status,
         featured: newProject.featured || false,
@@ -88,7 +183,7 @@ export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'u
       }
 
       if (!error && data) {
-        return { ...newProject, ...data };
+        savedProject = unpackProject({ ...newProject, ...data });
       }
       if (error) {
         console.warn('Supabase insert failed, saving to local store:', error.message);
@@ -98,21 +193,39 @@ export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'u
     }
   }
 
-  // Save to localStorage
+  // Always sync to localStorage
   if (typeof window !== 'undefined') {
-    const existing = await getProjects();
-    const updated = [newProject, ...existing];
-    localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(updated));
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY_PROJECTS);
+      const existing = stored ? (JSON.parse(stored) as Project[]) : [];
+      const updated = [savedProject, ...existing.filter((p) => p.id !== savedProject.id)];
+      localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Local storage save error:', e);
+    }
   }
 
-  return newProject;
+  return savedProject;
 }
 
 export async function updateProject(id: string, updates: Partial<Project>): Promise<Project | null> {
+  const currentProjects = await getProjects();
+  const current = currentProjects.find((p) => p.id === id);
+
+  const finalEmail = updates.assigned_client_email !== undefined ? updates.assigned_client_email : current?.assigned_client_email;
+  const finalName = updates.assigned_client_name !== undefined ? updates.assigned_client_name : current?.assigned_client_name;
+  const finalFeedbacks = updates.feedbacks !== undefined ? updates.feedbacks : current?.feedbacks;
+  const finalFeatures = updates.features !== undefined ? updates.features : current?.features;
+
+  const packedFeatures = packFeatures(finalFeatures, finalEmail, finalName, finalFeedbacks);
+
+  let updatedRecord: Project | null = current ? { ...current, ...updates, updated_at: new Date().toISOString() } : null;
+
   if (isSupabaseConfigured && supabase) {
     try {
       const payload: any = {
         ...updates,
+        features: packedFeatures,
         updated_at: new Date().toISOString(),
       };
 
@@ -141,33 +254,30 @@ export async function updateProject(id: string, updates: Partial<Project>): Prom
       }
 
       if (!error && data) {
-        // Also sync local storage
-        if (typeof window !== 'undefined') {
-          const existing = await getProjects();
-          const idx = existing.findIndex(p => p.id === id);
-          if (idx !== -1) {
-            existing[idx] = { ...existing[idx], ...updates, ...data, updated_at: new Date().toISOString() };
-            localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(existing));
-          }
-        }
-        return data as Project;
+        updatedRecord = unpackProject({ ...current, ...updates, ...data });
       }
     } catch (err) {
       console.error('Supabase update failed:', err);
     }
   }
 
-  if (typeof window !== 'undefined') {
-    const existing = await getProjects();
-    const idx = existing.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      existing[idx] = { ...existing[idx], ...updates, updated_at: new Date().toISOString() };
+  if (typeof window !== 'undefined' && updatedRecord) {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY_PROJECTS);
+      const existing = stored ? (JSON.parse(stored) as Project[]) : [];
+      const idx = existing.findIndex((p) => p.id === id);
+      if (idx !== -1) {
+        existing[idx] = updatedRecord;
+      } else {
+        existing.unshift(updatedRecord);
+      }
       localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(existing));
-      return existing[idx];
+    } catch (e) {
+      console.error('Local storage update error:', e);
     }
   }
 
-  return null;
+  return updatedRecord;
 }
 
 /** Submit client review & feedback for an assigned CST project */
@@ -206,20 +316,28 @@ export async function deleteProject(id: string): Promise<boolean> {
         .delete()
         .eq('id', id);
 
-      if (!error) return true;
+      if (error) {
+        console.warn('Supabase delete error:', error.message);
+      }
     } catch (err) {
       console.error('Supabase delete failed:', err);
     }
   }
 
   if (typeof window !== 'undefined') {
-    const existing = await getProjects();
-    const filtered = existing.filter(p => p.id !== id);
-    localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(filtered));
-    return true;
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY_PROJECTS);
+      if (stored) {
+        const existing = JSON.parse(stored) as Project[];
+        const filtered = existing.filter(p => p.id !== id);
+        localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(filtered));
+      }
+    } catch (e) {
+      console.error('Local storage delete error:', e);
+    }
   }
 
-  return false;
+  return true;
 }
 
 // ====================================================================

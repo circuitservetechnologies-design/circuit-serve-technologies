@@ -320,9 +320,29 @@ export default function ClientPortalPage() {
       // 2. Official CST Projects assigned by Admin specifically to this client for review
       const allCst = await getProjects();
       const userEmailNorm = user.email.trim().toLowerCase();
-      const assigned = allCst.filter(
+      let assigned = allCst.filter(
         (p) => p.assigned_client_email?.trim().toLowerCase() === userEmailNorm
       );
+
+      // Fallback: if Supabase returned projects but none are assigned (missing column migration),
+      // also check localStorage for the assignment data which is always written there by admin
+      if (assigned.length === 0 && typeof window !== 'undefined') {
+        try {
+          const lsRaw = localStorage.getItem('cst_projects_store_v1');
+          if (lsRaw) {
+            const lsProjects = JSON.parse(lsRaw) as Project[];
+            const lsAssigned = lsProjects.filter(
+              (p) => p.assigned_client_email?.trim().toLowerCase() === userEmailNorm
+            );
+            if (lsAssigned.length > 0) {
+              assigned = lsAssigned;
+            }
+          }
+        } catch (e) {
+          console.warn('localStorage fallback for assigned projects failed:', e);
+        }
+      }
+
       setAssignedCstProjects(assigned);
     } catch (err) {
       console.warn('Error loading projects:', err);
