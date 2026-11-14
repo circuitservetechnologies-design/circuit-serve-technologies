@@ -116,6 +116,56 @@ export default function ClientPortalPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
 
+  // Forgot Password Modal State
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotResult, setForgotResult] = useState<{
+    success: boolean;
+    message: string;
+    resetLink?: string;
+    emailSent?: boolean;
+  } | null>(null);
+  const [copiedResetLink, setCopiedResetLink] = useState(false);
+
+  const handleSendResetLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail || !forgotEmail.includes('@')) return;
+
+    setForgotLoading(true);
+    setForgotResult(null);
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setForgotResult({
+          success: true,
+          message: data.message || 'Password reset link generated successfully.',
+          resetLink: data.resetLink,
+          emailSent: data.emailSent,
+        });
+      } else {
+        setForgotResult({
+          success: false,
+          message: data.error || 'Failed to generate reset link. Please check the email entered.',
+        });
+      }
+    } catch (err: any) {
+      setForgotResult({
+        success: false,
+        message: err.message || 'Network error requesting password reset.',
+      });
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const handleSwitchMode = (mode: 'login' | 'register') => {
     setAuthMode(mode);
     setAuthError(null);
@@ -514,14 +564,15 @@ export default function ClientPortalPage() {
                     <div className="text-center pt-1">
                       <button
                         type="button"
-                        onClick={() =>
-                          setAuthError(
-                            '🔐 To reset your password, email us at circuitservetechnologies@gmail.com or WhatsApp +91 8985043496 with your registered email address.'
-                          )
-                        }
-                        className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline font-mono"
+                        onClick={() => {
+                          setForgotEmail(email || '');
+                          setForgotResult(null);
+                          setShowForgotPasswordModal(true);
+                        }}
+                        className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline font-mono inline-flex items-center gap-1"
                       >
-                        Forgot Password?
+                        <Key className="w-3 h-3" />
+                        <span>Forgot Password?</span>
                       </button>
                     </div>
                   )}
@@ -867,6 +918,155 @@ export default function ClientPortalPage() {
               </form>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-navy-900 border border-slate-200 dark:border-cyan-800/60 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-5 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-cyan-500" />
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">
+                  Reset Account Password
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowForgotPasswordModal(false);
+                  setForgotResult(null);
+                }}
+                className="text-xs font-mono text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-mono">
+              Enter your registered client account email address. We will generate an instant, secure password reset link for you.
+            </p>
+
+            {forgotResult ? (
+              <div className="space-y-4">
+                <div
+                  className={`p-4 rounded-xl text-xs font-mono space-y-2 border ${
+                    forgotResult.success
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-red-500/10 border-red-500/30 text-red-500'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold">
+                    {forgotResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                    )}
+                    <span>{forgotResult.success ? 'Reset Link Ready' : 'Unable to Reset'}</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {forgotResult.message}
+                  </p>
+                </div>
+
+                {forgotResult.success && forgotResult.resetLink && (
+                  <div className="space-y-3 pt-1">
+                    <a
+                      href={forgotResult.resetLink}
+                      className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white dark:text-navy-950 font-bold text-xs font-mono rounded-xl hover:from-cyan-400 hover:to-sky-400 transition-all shadow-md shadow-cyan-500/20 flex items-center justify-center gap-2"
+                    >
+                      <Key className="w-4 h-4" />
+                      <span>Proceed to Reset Password Now</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (forgotResult.resetLink) {
+                          navigator.clipboard.writeText(forgotResult.resetLink);
+                          setCopiedResetLink(true);
+                          setTimeout(() => setCopiedResetLink(false), 2000);
+                        }
+                      }}
+                      className="w-full py-2 bg-slate-100 dark:bg-navy-950 border border-slate-300 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 rounded-xl hover:border-cyan-500 transition-all flex items-center justify-center gap-2"
+                    >
+                      {copiedResetLink ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="text-emerald-500">Link Copied to Clipboard!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Copy Reset Link</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPasswordModal(false);
+                      setForgotResult(null);
+                    }}
+                    className="px-4 py-2 text-xs font-mono text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSendResetLink} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">
+                    Registered Email Address
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="client@company.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:border-cyan-500 focus:outline-none font-mono"
+                      autoFocus
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPasswordModal(false)}
+                    className="px-3.5 py-2 text-xs font-mono text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading || !forgotEmail}
+                    className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white dark:text-navy-950 font-bold text-xs font-mono rounded-xl hover:from-cyan-400 hover:to-sky-400 transition-all shadow-md shadow-cyan-500/20 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {forgotLoading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Generating Link...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send Password Reset Link</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
