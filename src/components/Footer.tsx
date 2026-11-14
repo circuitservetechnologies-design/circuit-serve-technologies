@@ -136,10 +136,6 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-mono">
           <p>
             © {currentYear} {COMPANY_INFO.name}. Surampalem, Andhra Pradesh
-            {/* Hidden subtle doorway for the startup owner only - no visible text */}
-            <Link href="/admin" className="opacity-0 hover:opacity-10 text-slate-700 cursor-default select-none" tabIndex={-1}>
-              .
-            </Link>
           </p>
           
           <div className="flex items-center gap-4">

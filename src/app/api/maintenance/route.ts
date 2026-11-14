@@ -1,53 +1,35 @@
 import { NextResponse } from 'next/server';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { getPersistentState, setPersistentState } from '@/lib/serverState';
 
-// In-memory server cache
-let serverMaintenanceState = false;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
-  // If Supabase is configured, check database
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'maintenance_mode')
-        .maybeSingle();
-
-      if (!error && data && typeof data.value?.enabled === 'boolean') {
-        serverMaintenanceState = data.value.enabled;
-        return NextResponse.json({ maintenance: serverMaintenanceState });
-      }
-    } catch (e) {
-      console.warn('Supabase maintenance read in API route:', e);
+  const state = await getPersistentState();
+  return NextResponse.json(
+    { maintenance: state.maintenance, updated_at: state.updated_at },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      },
     }
-  }
-
-  return NextResponse.json({ maintenance: serverMaintenanceState });
+  );
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const enabled = Boolean(body?.enabled);
-    serverMaintenanceState = enabled;
+    const updated = await setPersistentState({ maintenance: enabled });
 
-    // Persist to Supabase if configured
-    if (isSupabaseConfigured && supabase) {
-      try {
-        await supabase.from('site_settings').upsert([
-          {
-            key: 'maintenance_mode',
-            value: { enabled, updated_at: new Date().toISOString() },
-            updated_at: new Date().toISOString(),
-          },
-        ]);
-      } catch (e) {
-        console.warn('Supabase maintenance write in API route:', e);
+    return NextResponse.json(
+      { success: true, maintenance: updated.maintenance, updated_at: updated.updated_at },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        },
       }
-    }
-
-    return NextResponse.json({ success: true, maintenance: serverMaintenanceState });
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to update' }, { status: 500 });
   }

@@ -121,24 +121,6 @@ export async function registerClient(data: {
 export async function loginUser(email: string, passOrPin: string): Promise<{ user: User | null; error?: string }> {
   const emailNorm = email.trim().toLowerCase();
   const pinInput = passOrPin.trim();
-  const expectedAdminPin = process.env.NEXT_PUBLIC_ADMIN_PIN || 'CST@2026';
-
-  // Check if admin login
-  if (
-    (emailNorm === 'admin' || emailNorm === 'circuitservetechnologies@gmail.com' || emailNorm === 'admin@circuitserve.com') &&
-    pinInput === expectedAdminPin
-  ) {
-    const adminUser: User = {
-      id: 'admin_cst',
-      name: 'Circuit Serve Admin',
-      email: 'circuitservetechnologies@gmail.com',
-      role: 'admin',
-      organization: 'Circuit Serve Technologies HQ',
-      created_at: new Date().toISOString(),
-    };
-    setCurrentUser(adminUser);
-    return { user: adminUser };
-  }
 
   // Check existing users in storage
   const users = getStoredUsers();

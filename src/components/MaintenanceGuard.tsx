@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
 import CSTLogo from './CSTLogo';
 import ThemeToggle from './ThemeToggle';
 import { getMaintenanceStatus } from '@/lib/maintenance';
@@ -14,58 +13,94 @@ import {
   Mail, 
   MapPin, 
   MessageSquare, 
-  RefreshCw, 
-  ShieldAlert, 
-  Lock,
-  ArrowRight
+  RefreshCw,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 
 export default function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isMaintenance, setIsMaintenance] = useState(false);
+  const [isMaintenance, setIsMaintenance] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('cst_maintenance_mode_v1') === 'true';
+    }
+    return false;
+  });
   const [checking, setChecking] = useState(true);
+  const [manualChecking, setManualChecking] = useState(false);
+  const [checkNotice, setCheckNotice] = useState<string | null>(null);
 
   // Admin routes are NEVER blocked by maintenance mode
   const isAdminRoute = pathname?.startsWith('/admin');
 
-  const checkStatus = async () => {
+  const verifyStatus = async (isManual = false) => {
+    if (isManual) setManualChecking(true);
     try {
       const active = await getMaintenanceStatus();
       setIsMaintenance(active);
+      if (isManual) {
+        if (!active) {
+          setCheckNotice('Systems back online! Restoring website...');
+          setTimeout(() => {
+            window.location.reload();
+          }, 800);
+        } else {
+          setCheckNotice('Maintenance is currently still in progress. Please check back shortly.');
+          setTimeout(() => setCheckNotice(null), 4000);
+        }
+      }
     } catch (e) {
       console.warn(e);
     } finally {
       setChecking(false);
+      if (isManual) setManualChecking(false);
     }
   };
 
   useEffect(() => {
-    checkStatus();
+    verifyStatus();
 
     // Listen to maintenance toggle events in real-time
     const handleToggle = (e: any) => {
       if (typeof e.detail?.enabled === 'boolean') {
         setIsMaintenance(e.detail.enabled);
       } else {
-        checkStatus();
+        verifyStatus();
       }
     };
 
     window.addEventListener('cst_maintenance_toggle', handleToggle);
-    window.addEventListener('storage', checkStatus);
+    window.addEventListener('storage', () => verifyStatus());
 
     return () => {
       window.removeEventListener('cst_maintenance_toggle', handleToggle);
-      window.removeEventListener('storage', checkStatus);
+      window.removeEventListener('storage', () => verifyStatus());
     };
   }, []);
 
-  // If on admin page or maintenance is not active, render normal website
-  if (isAdminRoute || !isMaintenance) {
+  // Admin routes always pass through immediately
+  if (isAdminRoute) {
     return <>{children}</>;
   }
 
-  // If maintenance is active, render the Maintenance Screen
+  // Prevent flash of user content before status check completes
+  if (checking && !isMaintenance) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-mono text-slate-500">Connecting to Circuit Serve...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // If maintenance is OFF, render normal website
+  if (!isMaintenance) {
+    return <>{children}</>;
+  }
+
+  // If maintenance is ON, render the robust Maintenance Screen
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-cyan-500 selection:text-navy-950 relative overflow-hidden">
       {/* Background Circuit Grid Glow */}
@@ -151,19 +186,27 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
           </div>
         </div>
 
-        {/* Check Status Button */}
-        <div>
+        {/* Check Status Button with Live Feedback */}
+        <div className="space-y-2 pt-2">
           <button
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-500 hover:text-cyan-400 transition-colors"
+            onClick={() => verifyStatus(true)}
+            disabled={manualChecking}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 transition-all disabled:opacity-50"
           >
-            <RefreshCw className="w-3 h-3" />
-            <span>Check If Maintenance Has Completed</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${manualChecking ? 'animate-spin text-cyan-400' : ''}`} />
+            <span>{manualChecking ? 'Checking System Status...' : 'Check If Maintenance Has Completed'}</span>
           </button>
+
+          {checkNotice && (
+            <div className="flex items-center justify-center gap-2 text-xs font-mono text-amber-400/90 animate-fadeIn">
+              <Clock className="w-3.5 h-3.5" />
+              <span>{checkNotice}</span>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - Strictly clean with zero admin links */}
       <footer className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 text-center border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-600">
         <div className="flex items-center gap-1.5">
           <MapPin className="w-3.5 h-3.5 text-cyan-500/70" />

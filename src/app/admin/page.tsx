@@ -101,21 +101,112 @@ export default function AdminPage() {
     client_name: '',
   });
 
-  // Auth session check: PIN is always required for fresh visits to protect Admin authority
-  const handleLogin = (e: React.FormEvent) => {
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [isGateUnlocked, setIsGateUnlocked] = useState(false);
+
+  // Change PIN modal state
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinChangeForm, setPinChangeForm] = useState({ currentPin: '', newPin: '', confirmPin: '' });
+  const [pinChangeLoading, setPinChangeLoading] = useState(false);
+  const [pinChangeMsg, setPinChangeMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Secret Gate check: If anyone accesses /admin without ?key=cst, it shows a 404 page
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const key = params.get('key') || params.get('access') || params.get('secret');
+      if (key === 'cst' || key === 'cst2026' || key === 'admin') {
+        setIsGateUnlocked(true);
+        sessionStorage.setItem('cst_admin_gate_unlocked', 'true');
+      } else if (sessionStorage.getItem('cst_admin_gate_unlocked') === 'true') {
+        setIsGateUnlocked(true);
+      }
+    }
+  }, []);
+
+  // Auth session check: Verified securely on server via /api/admin/auth
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const expectedPin = process.env.NEXT_PUBLIC_ADMIN_PIN || 'CST@2026';
-    if (pin.trim() === expectedPin.trim() || pin.trim() === 'CST@2026') {
-      setIsAuthenticated(true);
-      setAuthError(false);
-    } else {
+    if (!pin.trim()) return;
+
+    setLoginLoading(true);
+    setAuthError(false);
+
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', pin: pin.trim() }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsAuthenticated(true);
+        setAuthError(false);
+        if (data.token && typeof window !== 'undefined') {
+          sessionStorage.setItem('cst_admin_token', data.token);
+        }
+      } else {
+        setAuthError(true);
+      }
+    } catch (err) {
+      console.error('Admin auth error:', err);
       setAuthError(true);
+    } finally {
+      setLoginLoading(false);
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setPin('');
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('cst_admin_token');
+    }
+  };
+
+  const handleChangePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinChangeMsg(null);
+
+    if (pinChangeForm.newPin !== pinChangeForm.confirmPin) {
+      setPinChangeMsg({ type: 'error', text: 'New PIN and confirmation PIN do not match.' });
+      return;
+    }
+
+    if (pinChangeForm.newPin.length < 6) {
+      setPinChangeMsg({ type: 'error', text: 'New PIN must be at least 6 characters.' });
+      return;
+    }
+
+    setPinChangeLoading(true);
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'change_pin',
+          currentPin: pinChangeForm.currentPin.trim(),
+          newPin: pinChangeForm.newPin.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPinChangeMsg({ type: 'success', text: 'Admin PIN updated and permanently saved to cloud!' });
+        setTimeout(() => {
+          setShowPinModal(false);
+          setPinChangeForm({ currentPin: '', newPin: '', confirmPin: '' });
+          setPinChangeMsg(null);
+        }, 1800);
+      } else {
+        setPinChangeMsg({ type: 'error', text: data.error || 'Failed to update PIN.' });
+      }
+    } catch (err) {
+      setPinChangeMsg({ type: 'error', text: 'Network error updating PIN.' });
+    } finally {
+      setPinChangeLoading(false);
+    }
   };
 
   // Fetch data when authenticated
@@ -385,7 +476,31 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
     setTimeout(() => setCopiedSql(false), 3000);
   };
 
-  // Login Gate
+  // 1. DISGUISE GATE: If visited without ?key=cst, disguise as a normal 404 page so users never know the admin portal exists
+  if (!isGateUnlocked && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 text-center select-none font-sans">
+        <div className="space-y-4 max-w-md">
+          <h1 className="text-7xl font-extrabold text-slate-800 font-mono tracking-tight">404</h1>
+          <h2 className="text-xl font-bold text-slate-200">Page Not Found</h2>
+          <p className="text-xs text-slate-500 font-mono">
+            The requested page does not exist or has been relocated.
+          </p>
+          <div className="pt-4">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-mono text-slate-400 hover:text-white rounded-lg transition-all"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Return to Homepage</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. SECURE LOGIN GATE (Visible only when ?key=cst is used)
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-navy-950 flex items-center justify-center p-4 transition-colors">
@@ -397,7 +512,7 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">Circuit Serve Technologies</h1>
             <p className="text-xs font-mono text-cyan-600 dark:text-cyan-400">ADMIN CONTROL CENTER</p>
             <p className="text-xs text-slate-500">
-              Administrative authority for managing client proposals, projects, users, and website publications.
+              Authorized personnel only. Verification is processed securely on server.
             </p>
           </div>
 
@@ -411,24 +526,34 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   type="password"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  placeholder="Enter PIN"
+                  placeholder="Enter Security PIN"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 font-mono tracking-widest"
                   autoFocus
+                  disabled={loginLoading}
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               </div>
               {authError && (
-                <p className="mt-1.5 text-xs text-red-500 font-mono">
-                  Incorrect PIN.
+                <p className="mt-1.5 text-xs text-red-500 font-mono flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Access Denied: Incorrect Security Passkey</span>
                 </p>
               )}
             </div>
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white dark:text-navy-950 font-bold text-xs font-mono rounded-lg hover:from-cyan-400 hover:to-sky-400 transition-all shadow-md shadow-cyan-500/20"
+              disabled={loginLoading}
+              className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white dark:text-navy-950 font-bold text-xs font-mono rounded-lg hover:from-cyan-400 hover:to-sky-400 transition-all shadow-md shadow-cyan-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Unlock Admin Authority
+              {loginLoading ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Verifying Authority...</span>
+                </>
+              ) : (
+                <span>Unlock Admin Authority</span>
+              )}
             </button>
           </form>
 
@@ -496,6 +621,16 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
           >
             <Wrench className={`w-3.5 h-3.5 ${isMaintenance ? 'text-amber-500' : 'text-slate-400'}`} />
             <span>{isMaintenance ? 'Maintenance: ON' : 'Set Maintenance'}</span>
+          </button>
+
+          {/* Change Security PIN Button */}
+          <button
+            onClick={() => setShowPinModal(true)}
+            className="px-3 py-1.5 text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-navy-950 border border-slate-300 dark:border-slate-800 rounded-lg hover:border-amber-500 flex items-center gap-1.5 transition-colors"
+            title="Update Admin Security PIN"
+          >
+            <Key className="w-3.5 h-3.5 text-amber-500" />
+            <span>Change PIN</span>
           </button>
 
           <button
@@ -1613,6 +1748,126 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
                 Close Profile
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change PIN Modal */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-navy-900 border border-slate-200 dark:border-cyan-800/60 rounded-2xl p-6 shadow-2xl space-y-5 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-amber-500" />
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">
+                  Change Admin Security PIN
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPinModal(false);
+                  setPinChangeMsg(null);
+                }}
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Set a strong, private passkey to protect your administrative console. The new passkey will be permanently stored in cloud storage.
+            </p>
+
+            <form onSubmit={handleChangePin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">
+                  Current PIN
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={pinChangeForm.currentPin}
+                  onChange={(e) => setPinChangeForm({ ...pinChangeForm, currentPin: e.target.value })}
+                  placeholder="Enter current PIN"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">
+                  New Security PIN (minimum 6 characters)
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={pinChangeForm.newPin}
+                  onChange={(e) => setPinChangeForm({ ...pinChangeForm, newPin: e.target.value })}
+                  placeholder="Enter new strong PIN"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">
+                  Confirm New PIN
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={pinChangeForm.confirmPin}
+                  onChange={(e) => setPinChangeForm({ ...pinChangeForm, confirmPin: e.target.value })}
+                  placeholder="Re-type new PIN"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {pinChangeMsg && (
+                <div
+                  className={`p-3 rounded-lg text-xs font-mono flex items-center gap-2 ${
+                    pinChangeMsg.type === 'success'
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-500'
+                      : 'bg-red-500/10 border border-red-500/30 text-red-500'
+                  }`}
+                >
+                  {pinChangeMsg.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{pinChangeMsg.text}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPinModal(false);
+                    setPinChangeMsg(null);
+                  }}
+                  className="px-3.5 py-2 text-xs font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={pinChangeLoading}
+                  className="px-4 py-2 text-xs font-mono font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-400 hover:to-orange-400 transition-all disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {pinChangeLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving PIN...</span>
+                    </>
+                  ) : (
+                    <span>Save New PIN</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
