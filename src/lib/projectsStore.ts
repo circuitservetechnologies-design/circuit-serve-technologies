@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Project, Inquiry, ClientProject } from '@/types';
+import { Project, Inquiry, ClientProject, ProjectFeedback } from '@/types';
 
 const LOCAL_STORAGE_KEY_PROJECTS = 'cst_projects_store_v1';
 const LOCAL_STORAGE_KEY_INQUIRIES = 'cst_inquiries_store_v1';
@@ -43,36 +43,52 @@ export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'u
   const newProject: Project = {
     ...project,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `proj_${Date.now()}`,
+    feedbacks: project.feedbacks || [],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
+      const payload: any = {
+        title: newProject.title,
+        slug: newProject.slug || newProject.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        category: newProject.category,
+        summary: newProject.summary,
+        description: newProject.description,
+        client: newProject.client,
+        technologies: newProject.technologies,
+        features: newProject.features,
+        image_url: newProject.image_url,
+        status: newProject.status,
+        featured: newProject.featured || false,
+        completion_date: newProject.completion_date,
+        demo_url: newProject.demo_url,
+        assigned_client_email: newProject.assigned_client_email,
+        assigned_client_name: newProject.assigned_client_name,
+        feedbacks: newProject.feedbacks,
+      };
+
+      let { data, error } = await supabase
         .from('projects')
-        .insert([
-          {
-            title: newProject.title,
-            slug: newProject.slug || newProject.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            category: newProject.category,
-            summary: newProject.summary,
-            description: newProject.description,
-            client: newProject.client,
-            technologies: newProject.technologies,
-            features: newProject.features,
-            image_url: newProject.image_url,
-            status: newProject.status,
-            featured: newProject.featured || false,
-            completion_date: newProject.completion_date,
-            demo_url: newProject.demo_url,
-          }
-        ])
+        .insert([payload])
         .select()
         .single();
 
+      if (error) {
+        // If assigned_client_email or feedbacks columns don't exist yet in Supabase, strip them and retry
+        delete payload.assigned_client_email;
+        delete payload.assigned_client_name;
+        delete payload.feedbacks;
+        const retry = await supabase.from('projects').insert([payload]).select().single();
+        if (!retry.error && retry.data) {
+          data = retry.data;
+          error = null;
+        }
+      }
+
       if (!error && data) {
-        return data as Project;
+        return { ...newProject, ...data };
       }
       if (error) {
         console.warn('Supabase insert failed, saving to local store:', error.message);
@@ -95,17 +111,45 @@ export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'u
 export async function updateProject(id: string, updates: Partial<Project>): Promise<Project | null> {
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
+      const payload: any = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+
+      let { data, error } = await supabase
         .from('projects')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();
 
+      if (error) {
+        // Retry without newly added columns in case Supabase schema hasn't been migrated yet
+        delete payload.assigned_client_email;
+        delete payload.assigned_client_name;
+        delete payload.feedbacks;
+        const retry = await supabase
+          .from('projects')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+        if (!retry.error && retry.data) {
+          data = retry.data;
+          error = null;
+        }
+      }
+
       if (!error && data) {
+        // Also sync local storage
+        if (typeof window !== 'undefined') {
+          const existing = await getProjects();
+          const idx = existing.findIndex(p => p.id === id);
+          if (idx !== -1) {
+            existing[idx] = { ...existing[idx], ...updates, ...data, updated_at: new Date().toISOString() };
+            localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(existing));
+          }
+        }
         return data as Project;
       }
     } catch (err) {
@@ -124,6 +168,34 @@ export async function updateProject(id: string, updates: Partial<Project>): Prom
   }
 
   return null;
+}
+
+/** Submit client review & feedback for an assigned CST project */
+export async function addProjectFeedback(
+  projectId: string,
+  feedback: Omit<ProjectFeedback, 'id' | 'created_at'>
+): Promise<Project | null> {
+  const newFeedback: ProjectFeedback = {
+    ...feedback,
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fb_${Date.now()}`,
+    created_at: new Date().toISOString(),
+  };
+
+  const existing = await getProjects();
+  const proj = existing.find(p => p.id === projectId);
+  if (!proj) return null;
+
+  const updatedFeedbacks = [newFeedback, ...(proj.feedbacks || [])];
+  return await updateProject(projectId, {
+    feedbacks: updatedFeedbacks,
+  });
+}
+
+/** Get projects specifically assigned to a client by email */
+export async function getProjectsForClient(clientEmail: string): Promise<Project[]> {
+  const normalized = clientEmail.trim().toLowerCase();
+  const all = await getProjects();
+  return all.filter(p => p.assigned_client_email?.trim().toLowerCase() === normalized);
 }
 
 export async function deleteProject(id: string): Promise<boolean> {

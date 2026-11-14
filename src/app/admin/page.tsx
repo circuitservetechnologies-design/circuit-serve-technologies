@@ -51,7 +51,10 @@ import {
   MessageSquare,
   Key,
   X,
-  Wrench
+  Wrench,
+  Upload,
+  Image as ImageIcon,
+  Star
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -87,9 +90,13 @@ export default function AdminPage() {
     featured: false,
     completion_date: '',
     demo_url: '',
+    assigned_client_email: '',
+    assigned_client_name: '',
   });
 
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [feedbackViewingProject, setFeedbackViewingProject] = useState<Project | null>(null);
 
   // Modal to promote client project to public showcase
   const [promotingProject, setPromotingProject] = useState<ClientProject | null>(null);
@@ -279,6 +286,112 @@ export default function AdminPage() {
 
 
 
+  /** Process image file upload (PNG/JPG/WEBP), resize & convert to compact base64 data URL */
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'direct' | 'promote') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG, WEBP, etc.)');
+      return;
+    }
+
+    setUploadingImage(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // High quality, compact resize to keep client storage light & snappy
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        if (target === 'direct') {
+          setFormData((prev) => ({ ...prev, image_url: dataUrl }));
+        } else {
+          setPromoteForm((prev) => ({ ...prev, image_url: dataUrl }));
+        }
+        setUploadingImage(false);
+      };
+      img.onerror = () => {
+        const raw = event.target?.result as string;
+        if (target === 'direct') {
+          setFormData((prev) => ({ ...prev, image_url: raw }));
+        } else {
+          setPromoteForm((prev) => ({ ...prev, image_url: raw }));
+        }
+        setUploadingImage(false);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEditProject = (p: Project) => {
+    setEditingId(p.id);
+    setFormData({
+      title: p.title || '',
+      category: p.category || 'PCB Design & Layout',
+      summary: p.summary || '',
+      description: p.description || '',
+      client: p.client || '',
+      technologies: Array.isArray(p.technologies) ? p.technologies.join(', ') : '',
+      features: Array.isArray(p.features) ? p.features.join('\n') : '',
+      image_url: p.image_url || '',
+      status: p.status || 'Completed',
+      featured: !!p.featured,
+      completion_date: p.completion_date || '',
+      demo_url: p.demo_url || '',
+      assigned_client_email: p.assigned_client_email || '',
+      assigned_client_name: p.assigned_client_name || '',
+    });
+
+    const el = document.getElementById('project-form-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({
+      title: '',
+      category: 'PCB Design & Layout',
+      summary: '',
+      description: '',
+      client: '',
+      technologies: '',
+      features: '',
+      image_url: '',
+      status: 'Completed',
+      featured: false,
+      completion_date: '',
+      demo_url: '',
+      assigned_client_email: '',
+      assigned_client_name: '',
+    });
+  };
+
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.summary) {
@@ -310,6 +423,8 @@ export default function AdminPage() {
         featured: formData.featured,
         completion_date: formData.completion_date,
         demo_url: formData.demo_url,
+        assigned_client_email: formData.assigned_client_email,
+        assigned_client_name: formData.assigned_client_name,
       });
       setFormSuccess('Project updated successfully!');
       setEditingId(null);
@@ -327,6 +442,8 @@ export default function AdminPage() {
         featured: formData.featured,
         completion_date: formData.completion_date,
         demo_url: formData.demo_url,
+        assigned_client_email: formData.assigned_client_email,
+        assigned_client_name: formData.assigned_client_name,
       });
       setFormSuccess('Project published to public website!');
     }
@@ -344,6 +461,8 @@ export default function AdminPage() {
       featured: false,
       completion_date: '',
       demo_url: '',
+      assigned_client_email: '',
+      assigned_client_name: '',
     });
 
     await loadData();
@@ -888,17 +1007,42 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
         {/* TAB 2: PUBLIC WEBSITE PORTFOLIO */}
         {activeTab === 'projects' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-5 bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 h-fit space-y-4">
+            <div id="project-form-section" className="lg:col-span-5 bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 h-fit space-y-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-cyan-500" />
-                  <span>{editingId ? 'Edit Project' : 'Direct Project Upload'}</span>
+                  {editingId ? <Edit3 className="w-4 h-4 text-cyan-500" /> : <Plus className="w-4 h-4 text-cyan-500" />}
+                  <span>{editingId ? 'Edit Project Details' : 'Direct Project Upload'}</span>
                 </h3>
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="text-xs font-mono text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 transition-colors"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
               </div>
+
+              {editingId && (
+                <div className="p-2.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-300 dark:border-cyan-800 text-xs font-mono text-cyan-700 dark:text-cyan-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 truncate">
+                    <Edit3 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Editing: <strong>{formData.title || 'Selected Project'}</strong></span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="text-cyan-600 dark:text-cyan-400 underline font-bold shrink-0 ml-2"
+                  >
+                    Reset Form
+                  </button>
+                </div>
+              )}
 
               {formSuccess && (
                 <div className="p-3 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs rounded-lg flex items-center gap-2">
-                  <Check className="w-4 h-4" />
+                  <Check className="w-4 h-4 shrink-0" />
                   <span>{formSuccess}</span>
                 </div>
               )}
@@ -948,6 +1092,50 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   </div>
                 </div>
 
+                {/* ASSIGN REGISTERED CLIENT FOR REVIEW & FEEDBACK */}
+                <div className="p-3 rounded-xl bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 space-y-2">
+                  <label className="block font-mono text-slate-800 dark:text-slate-200 font-semibold flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <UserIcon className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                      <span>Assign Client for Review & Feedback</span>
+                    </span>
+                    <span className="text-[10px] text-cyan-700 dark:text-cyan-300 font-normal">
+                      Only this client can review
+                    </span>
+                  </label>
+                  <select
+                    value={formData.assigned_client_email}
+                    onChange={(e) => {
+                      const selectedEmail = e.target.value;
+                      const clientObj = usersList.find((u) => u.email.toLowerCase() === selectedEmail.toLowerCase());
+                      setFormData({
+                        ...formData,
+                        assigned_client_email: selectedEmail,
+                        assigned_client_name: clientObj ? clientObj.name : '',
+                        client: formData.client || (clientObj ? clientObj.organization || clientObj.name : ''),
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-white dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 text-xs font-mono"
+                  >
+                    <option value="">-- No Assigned Client (Public Showcase Project) --</option>
+                    {usersList.map((u) => (
+                      <option key={u.id} value={u.email}>
+                        {u.name} ({u.email}) {u.organization ? `— ${u.organization}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {formData.assigned_client_email ? (
+                    <p className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span>Client <strong>{formData.assigned_client_name || formData.assigned_client_email}</strong> will be the exclusive reviewer on their Client Portal.</span>
+                    </p>
+                  ) : (
+                    <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                      Select a registered client from the dropdown so they can review specs, provide feedback, and give sign-off on their collaboration portal.
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">Short Summary *</label>
                   <textarea
@@ -960,9 +1148,20 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   />
                 </div>
 
+                <div>
+                  <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">Detailed Description (Optional)</label>
+                  <textarea
+                    rows={3}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="In-depth project breakdown, client problem solved, circuit topology..."
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 resize-none"
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">Client Name</label>
+                    <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">Client / Org Label</label>
                     <input
                       type="text"
                       value={formData.client}
@@ -1009,15 +1208,63 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   />
                 </div>
 
-                <div>
-                  <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">Project Image URL (Optional)</label>
-                  <input
-                    type="url"
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
-                  />
+                {/* PHOTO UPLOADER (DIRECT FILE UPLOAD OR URL) */}
+                <div className="space-y-2">
+                  <label className="block font-mono text-slate-700 dark:text-slate-300 font-semibold">
+                    Project Photo / Hardware Image
+                  </label>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-50 to-sky-50 dark:from-cyan-950/60 dark:to-navy-900 hover:from-cyan-100 hover:to-sky-100 dark:hover:from-cyan-900/60 dark:hover:to-navy-800 border border-cyan-300 dark:border-cyan-800 rounded-xl text-cyan-800 dark:text-cyan-300 font-mono text-xs font-bold cursor-pointer transition-all shadow-sm">
+                      <Upload className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                      <span>{uploadingImage ? 'Processing Photo...' : 'Upload Photo from Device'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageFileUpload(e, 'direct')}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                    </label>
+                  </div>
+
+                  {formData.image_url ? (
+                    <div className="relative rounded-xl overflow-hidden border border-cyan-300 dark:border-cyan-800 bg-slate-100 dark:bg-navy-950 h-44 group shadow-sm">
+                      <img
+                        src={formData.image_url}
+                        alt="Project Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, image_url: '' })}
+                          className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-mono font-bold shadow flex items-center gap-1.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove Photo</span>
+                        </button>
+                      </div>
+                      <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/75 text-[10px] font-mono text-emerald-400 border border-emerald-500/40">
+                        ✓ Photo Attached
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-navy-950/60 border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-1">
+                      <ImageIcon className="w-6 h-6 text-slate-400 mx-auto" />
+                      <p className="text-[11px] text-slate-500 font-mono">No photo chosen yet. Click the button above to upload a photo of the PCB, board, or hardware.</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <input
+                      type="text"
+                      value={formData.image_url}
+                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                      placeholder="Or paste image URL (https://...)"
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] text-slate-900 dark:text-white font-mono focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
@@ -1033,26 +1280,42 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   </label>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white dark:text-navy-950 font-bold text-xs font-mono rounded-lg hover:from-cyan-400 hover:to-sky-400 transition-all shadow-md shadow-cyan-500/20"
-                >
-                  {editingId ? 'Save Changes' : 'Publish Project to Website'}
-                </button>
+                <div className="flex items-center gap-2 pt-2">
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-4 py-2.5 bg-slate-100 dark:bg-navy-950 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 font-bold text-xs font-mono rounded-lg hover:bg-slate-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white dark:text-navy-950 font-bold text-xs font-mono rounded-lg hover:from-cyan-400 hover:to-sky-400 transition-all shadow-md shadow-cyan-500/20 active:scale-95"
+                  >
+                    {editingId ? 'Save & Update Project Details' : 'Publish Project to Website'}
+                  </button>
+                </div>
               </form>
             </div>
 
             {/* List */}
             <div className="lg:col-span-7 space-y-4">
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Public Published Projects ({projects.length})
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                  Published Projects ({projects.length})
+                </h3>
+                <span className="text-xs font-mono text-slate-500">
+                  Click Edit on any project to modify details or re-assign client
+                </span>
+              </div>
 
               {projects.length === 0 ? (
                 <div className="p-12 text-center rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 space-y-3">
                   <Sparkles className="w-8 h-8 text-cyan-500 mx-auto" />
                   <h4 className="font-bold text-slate-900 dark:text-white">Portfolio Empty</h4>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
                     Use the upload form on the left or promote client proposals from Tab 1 to publish real projects to the public website.
                   </p>
                 </div>
@@ -1061,35 +1324,83 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                   {projects.map((p) => (
                     <div
                       key={p.id}
-                      className="p-4 rounded-xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4"
+                      className={`p-4 rounded-xl bg-white dark:bg-navy-900 border transition-all ${
+                        editingId === p.id
+                          ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-md'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-cyan-500/50'
+                      } flex flex-col sm:flex-row sm:items-center justify-between gap-4`}
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 text-[10px] font-mono bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 rounded">
-                            {p.category}
-                          </span>
-                          <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                            {p.status}
-                          </span>
-                          {p.featured && (
-                            <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">
-                              Featured
+                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                        {p.image_url ? (
+                          <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-navy-950">
+                            <img src={p.image_url} alt={p.title} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0">
+                            <ImageIcon className="w-6 h-6 text-slate-400" />
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="px-2 py-0.5 text-[10px] font-mono bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 rounded">
+                              {p.category}
                             </span>
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                              {p.status}
+                            </span>
+                            {p.featured && (
+                              <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">
+                                Featured
+                              </span>
+                            )}
+                            {p.assigned_client_email && (
+                              <span className="text-[10px] font-mono bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded flex items-center gap-1">
+                                <UserIcon className="w-3 h-3 text-purple-500" />
+                                <span>Client: {p.assigned_client_name || p.assigned_client_email}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{p.title}</h4>
+                          <p className="text-xs text-slate-500 line-clamp-1">{p.summary}</p>
+
+                          {/* Feedback badge if any */}
+                          {p.feedbacks && p.feedbacks.length > 0 && (
+                            <div className="pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setFeedbackViewingProject(p)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors"
+                              >
+                                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                                <span>Client Reviews ({p.feedbacks.length})</span>
+                              </button>
+                            </div>
                           )}
                         </div>
-                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">{p.title}</h4>
-                        <p className="text-xs text-slate-500 line-clamp-1">{p.summary}</p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          onClick={() => handleEditProject(p)}
+                          className="px-3 py-1.5 text-xs font-mono font-medium text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 dark:hover:bg-cyan-900/80 border border-cyan-300 dark:border-cyan-800/80 rounded-lg flex items-center gap-1.5 transition-colors"
+                          title="Edit project details"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+
                         <button
                           onClick={async () => {
-                            if (confirm(`Delete "${p.title}"?`)) {
+                            if (confirm(`Delete project "${p.title}"?`)) {
                               await deleteProject(p.id);
+                              if (editingId === p.id) handleCancelEdit();
                               await loadData();
                             }
                           }}
-                          className="p-2 text-slate-400 hover:text-red-500 rounded-lg"
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg border border-slate-200 dark:border-slate-800 transition-colors"
+                          title="Delete project"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1441,14 +1752,39 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
                 />
               </div>
 
-              <div>
-                <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1">Image URL (Optional)</label>
+              <div className="space-y-1.5">
+                <label className="block font-mono text-slate-700 dark:text-slate-300">Project Photo / Image</label>
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 border border-cyan-300 dark:border-cyan-800 rounded-lg text-cyan-700 dark:text-cyan-300 font-mono text-xs font-bold cursor-pointer">
+                    <Upload className="w-3.5 h-3.5 text-cyan-500" />
+                    <span>{uploadingImage ? 'Uploading...' : 'Upload Photo File'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageFileUpload(e, 'promote')}
+                      className="hidden"
+                      disabled={uploadingImage}
+                    />
+                  </label>
+                </div>
+                {promoteForm.image_url ? (
+                  <div className="relative rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700 h-28">
+                    <img src={promoteForm.image_url} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setPromoteForm({ ...promoteForm, image_url: '' })}
+                      className="absolute top-1.5 right-1.5 px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-mono"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
                 <input
-                  type="url"
+                  type="text"
                   value={promoteForm.image_url}
                   onChange={(e) => setPromoteForm({ ...promoteForm, image_url: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                  placeholder="Or paste image URL (https://...)"
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-[11px] font-mono"
                 />
               </div>
 
@@ -1868,6 +2204,100 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CLIENT FEEDBACK & REVIEWS VIEW MODAL */}
+      {feedbackViewingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-cyan-800/60 rounded-2xl p-6 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                  <span>Client Reviews & Sign-off Feedback</span>
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
+                  {feedbackViewingProject.title}
+                </h3>
+                {feedbackViewingProject.assigned_client_email && (
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                    Assigned Reviewer: <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{feedbackViewingProject.assigned_client_name || feedbackViewingProject.assigned_client_email}</span> ({feedbackViewingProject.assigned_client_email})
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setFeedbackViewingProject(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+              {!feedbackViewingProject.feedbacks || feedbackViewingProject.feedbacks.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                  No feedback reviews recorded yet for this project.
+                </div>
+              ) : (
+                feedbackViewingProject.feedbacks.map((fb, idx) => (
+                  <div
+                    key={fb.id || idx}
+                    className="p-4 rounded-xl bg-slate-50 dark:bg-navy-950/70 border border-slate-200 dark:border-slate-800 space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-slate-900 dark:text-white font-mono">{fb.user_name}</span>
+                        <span className="text-[11px] text-slate-500 font-mono">({fb.user_email})</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {new Date(fb.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {fb.rating && (
+                        <div className="flex items-center text-amber-400">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3.5 h-3.5 ${
+                                i < fb.rating! ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-700'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {fb.review_status && (
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
+                          fb.review_status === 'Approved'
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                            : fb.review_status === 'Revision Requested'
+                            ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+                            : 'bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800'
+                        }`}>
+                          {fb.review_status}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-white dark:bg-navy-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 font-sans">
+                      {fb.comment}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                onClick={() => setFeedbackViewingProject(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs rounded-lg hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

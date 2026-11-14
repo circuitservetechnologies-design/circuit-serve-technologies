@@ -1,6 +1,6 @@
 import React from 'react';
 import { Project } from '@/types';
-import { X, ExternalLink, Calendar, CheckCircle, Tag, Cpu, Building2 } from 'lucide-react';
+import { X, ExternalLink, Calendar, CheckCircle, Tag, Cpu, Building2, Star } from 'lucide-react';
 
 interface ProjectModalProps {
   project: Project | null;
@@ -128,6 +128,58 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
                 <span>View Schematic / External Reference</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
+            </div>
+          )}
+
+          {/* Client Feedback & Reviews */}
+          {project.feedbacks && project.feedbacks.length > 0 && (
+            <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-mono uppercase tracking-wider text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5 fill-purple-500 text-purple-500" />
+                <span>Verified Client Reviews ({project.feedbacks.length})</span>
+              </h4>
+
+              <div className="space-y-2">
+                {project.feedbacks.map((fb, idx) => (
+                  <div
+                    key={fb.id || idx}
+                    className="p-3.5 rounded-xl bg-slate-50 dark:bg-navy-950/70 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold font-mono text-slate-800 dark:text-slate-200">
+                        {fb.user_name}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {new Date(fb.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {fb.rating && (
+                        <div className="flex items-center text-amber-400">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3 h-3 ${
+                                i < fb.rating! ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-700'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {fb.review_status && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                          {fb.review_status}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed italic">
+                      "{fb.comment}"
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

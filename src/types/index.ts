@@ -30,6 +30,17 @@ export interface ClientProject {
   updated_at: string;
 }
 
+export interface ProjectFeedback {
+  id: string;
+  user_id?: string;
+  user_name: string;
+  user_email: string;
+  rating?: number;
+  review_status?: 'Approved' | 'Revision Requested' | 'In Review' | 'Feedback Provided';
+  comment: string;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -38,6 +49,8 @@ export interface Project {
   summary: string;
   description?: string;
   client?: string;
+  assigned_client_email?: string;
+  assigned_client_name?: string;
   technologies: string[];
   features: string[];
   image_url?: string;
@@ -45,6 +58,7 @@ export interface Project {
   featured?: boolean;
   completion_date?: string;
   demo_url?: string;
+  feedbacks?: ProjectFeedback[];
   created_at?: string;
   updated_at?: string;
 }

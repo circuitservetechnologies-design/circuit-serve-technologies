@@ -5,8 +5,8 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthContext';
-import { submitClientProject, getClientProjects } from '@/lib/projectsStore';
-import { ClientProject } from '@/types';
+import { submitClientProject, getClientProjects, getProjects, addProjectFeedback } from '@/lib/projectsStore';
+import { ClientProject, Project, ProjectFeedback } from '@/types';
 import { COMPANY_INFO } from '@/lib/constants';
 import {
   Cpu,
@@ -33,7 +33,9 @@ import {
   Check,
   RefreshCw,
   ShieldCheck,
-  Key
+  Key,
+  Star,
+  MessageSquare
 } from 'lucide-react';
 
 /** Generate a strong random password */
@@ -276,8 +278,17 @@ export default function ClientPortalPage() {
 
   // Projects State
   const [clientProjects, setClientProjects] = useState<ClientProject[]>([]);
+  const [assignedCstProjects, setAssignedCstProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+
+  // Review & Feedback State for Assigned CST Projects
+  const [feedbackModalProject, setFeedbackModalProject] = useState<Project | null>(null);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewStatus, setReviewStatus] = useState<ProjectFeedback['review_status']>('Approved');
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
 
   // New Project Form State
   const [projectForm, setProjectForm] = useState({
@@ -301,9 +312,74 @@ export default function ClientPortalPage() {
   const loadProjects = async () => {
     if (!user) return;
     setLoadingProjects(true);
-    const data = await getClientProjects(user.id);
-    setClientProjects(data);
-    setLoadingProjects(false);
+    try {
+      // 1. Projects requested by this client
+      const data = await getClientProjects(user.id);
+      setClientProjects(data);
+
+      // 2. Official CST Projects assigned by Admin specifically to this client for review
+      const allCst = await getProjects();
+      const userEmailNorm = user.email.trim().toLowerCase();
+      const assigned = allCst.filter(
+        (p) => p.assigned_client_email?.trim().toLowerCase() === userEmailNorm
+      );
+      setAssignedCstProjects(assigned);
+    } catch (err) {
+      console.warn('Error loading projects:', err);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const handleOpenFeedback = (p: Project) => {
+    setFeedbackModalProject(p);
+    // If client already gave feedback on this project, prepopulate it
+    const existing = p.feedbacks?.find(
+      (f) => f.user_email?.toLowerCase() === user?.email.toLowerCase()
+    );
+    if (existing) {
+      setReviewRating(existing.rating || 5);
+      setReviewStatus(existing.review_status || 'Approved');
+      setReviewComment(existing.comment || '');
+    } else {
+      setReviewRating(5);
+      setReviewStatus('Approved');
+      setReviewComment('');
+    }
+    setReviewSuccess(null);
+  };
+
+  const handleSubmitFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackModalProject || !user) return;
+    if (!reviewComment.trim()) {
+      alert('Please enter your review comment or sign-off feedback.');
+      return;
+    }
+
+    setReviewSubmitting(true);
+    try {
+      await addProjectFeedback(feedbackModalProject.id, {
+        user_id: user.id,
+        user_name: user.name,
+        user_email: user.email,
+        rating: reviewRating,
+        review_status: reviewStatus,
+        comment: reviewComment.trim(),
+      });
+
+      setReviewSuccess('Review & Feedback submitted successfully! The CST engineering team has received your updates.');
+      await loadProjects();
+      setTimeout(() => {
+        setFeedbackModalProject(null);
+        setReviewComment('');
+        setReviewSuccess(null);
+      }, 2200);
+    } catch (err: any) {
+      alert('Failed to submit feedback: ' + (err.message || 'Unknown error'));
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -731,8 +807,182 @@ export default function ClientPortalPage() {
                 </div>
               </div>
 
-              {/* Client Projects List */}
+              {/* ================================================================
+                  ASSIGNED CST PROJECTS FOR REVIEW & CLIENT SIGN-OFF
+              ================================================================ */}
               <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 text-xs font-mono border border-purple-200 dark:border-purple-800 mb-1">
+                      <Star className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 fill-purple-500" />
+                      <span>EXCLUSIVE CLIENT REVIEW ACCESS</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                      CST Projects Assigned to You for Review ({assignedCstProjects.length})
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Review engineering milestones, inspect hardware specifications, and provide feedback directly to Circuit Serve Technologies.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={loadProjects}
+                    className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 shrink-0 self-start sm:self-center"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Refresh Projects</span>
+                  </button>
+                </div>
+
+                {assignedCstProjects.length === 0 ? (
+                  <div className="p-8 rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+                    <ShieldCheck className="w-10 h-10 text-cyan-500/60 mx-auto" />
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-white">
+                      No Projects Assigned for Review Yet
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                      When the CST engineering team links a custom hardware project to your email (<code>{user?.email}</code>), it will appear here exclusively for you to inspect and give design sign-off.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {assignedCstProjects.map((p) => {
+                      const clientFeedback = p.feedbacks?.find(
+                        (f) => f.user_email?.toLowerCase() === user.email.toLowerCase()
+                      );
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="bg-white dark:bg-navy-900 border-2 border-purple-200 dark:border-purple-900/60 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all flex flex-col justify-between"
+                        >
+                          <div>
+                            {/* Photo / Banner */}
+                            <div className="relative h-48 w-full bg-slate-100 dark:bg-navy-950 overflow-hidden border-b border-slate-200 dark:border-slate-800">
+                              {p.image_url ? (
+                                <img
+                                  src={p.image_url}
+                                  alt={p.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                                  <Cpu className="w-12 h-12 text-cyan-500/60" />
+                                  <span className="text-[11px] font-mono uppercase tracking-wider">
+                                    CST Hardware Design
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="absolute top-3 left-3">
+                                <span className="px-2.5 py-1 text-[11px] font-mono font-medium rounded-md bg-white/90 dark:bg-navy-950/90 backdrop-blur-md border border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300 shadow">
+                                  {p.category}
+                                </span>
+                              </div>
+
+                              <div className="absolute top-3 right-3">
+                                <span className="px-2.5 py-1 text-[10px] font-mono rounded font-semibold uppercase bg-emerald-100 dark:bg-emerald-950/90 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shadow">
+                                  {p.status}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Details */}
+                            <div className="p-6 space-y-4">
+                              <div>
+                                <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                                  {p.title}
+                                </h4>
+                                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                                  {p.summary}
+                                </p>
+                              </div>
+
+                              {p.description && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 bg-slate-50 dark:bg-navy-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                                  {p.description}
+                                </p>
+                              )}
+
+                              {p.technologies && p.technologies.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {p.technologies.map((t, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="px-2 py-0.5 text-[10px] font-mono bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 rounded border border-cyan-200 dark:border-cyan-800"
+                                    >
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Prior Feedback if exists */}
+                              {clientFeedback ? (
+                                <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 space-y-2">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-bold font-mono text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                                      <span>Your Submitted Review & Feedback:</span>
+                                    </span>
+                                    <span className="text-[10px] font-mono text-slate-400">
+                                      {new Date(clientFeedback.created_at).toLocaleDateString()}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {clientFeedback.rating && (
+                                      <div className="flex items-center text-amber-400">
+                                        {Array.from({ length: 5 }).map((_, i) => (
+                                          <Star
+                                            key={i}
+                                            className={`w-3.5 h-3.5 ${
+                                              i < clientFeedback.rating! ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-700'
+                                            }`}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                    {clientFeedback.review_status && (
+                                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700">
+                                        {clientFeedback.review_status}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <p className="text-xs text-slate-700 dark:text-slate-300 italic whitespace-pre-wrap">
+                                    "{clientFeedback.comment}"
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs font-mono text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                                  <Clock className="w-4 h-4 shrink-0" />
+                                  <span>Pending your client review & feedback. Click below to submit sign-off.</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="p-6 pt-0">
+                            <button
+                              onClick={() => handleOpenFeedback(p)}
+                              className="w-full py-2.5 rounded-xl text-xs font-mono font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 transition-all shadow-md shadow-purple-500/20 active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              <span>{clientFeedback ? 'Update Your Review & Feedback' : 'Give Review / Feedback on This Project'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ================================================================
+                  CLIENT PROJECT PROPOSALS & REQUESTS
+              ================================================================ */}
+              <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                     Your Assigned Projects & Requests ({clientProjects.length})
@@ -1223,6 +1473,132 @@ export default function ClientPortalPage() {
                       </>
                     ) : (
                       <span>Verify Code & Set Password</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CLIENT REVIEW & FEEDBACK SUBMISSION MODAL */}
+      {feedbackModalProject && user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-navy-900 border border-slate-200 dark:border-cyan-800/60 rounded-2xl p-6 sm:p-7 space-y-4 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 fill-purple-500 text-purple-500" />
+                  <span>Exclusive Client Review & Sign-off</span>
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
+                  {feedbackModalProject.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setFeedbackModalProject(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg text-sm font-mono"
+              >
+                ✕
+              </button>
+            </div>
+
+            {reviewSuccess ? (
+              <div className="py-8 text-center space-y-3">
+                <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto animate-bounce" />
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                  Feedback Received by CST Team!
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto font-mono">
+                  {reviewSuccess}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitFeedback} className="space-y-4 text-xs font-sans">
+                {/* Star Rating */}
+                <div>
+                  <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1.5 font-semibold">
+                    Engineering Rating / Satisfaction
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        type="button"
+                        key={star}
+                        onClick={() => setReviewRating(star)}
+                        className="p-1 hover:scale-110 transition-transform"
+                      >
+                        <Star
+                          className={`w-6 h-6 ${
+                            star <= reviewRating
+                              ? 'text-amber-400 fill-amber-400'
+                              : 'text-slate-300 dark:text-slate-700'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                    <span className="text-xs font-mono text-slate-500 dark:text-slate-400 ml-2">
+                      ({reviewRating} / 5 Stars)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Review Status */}
+                <div>
+                  <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1 font-semibold">
+                    Design Status / Client Decision *
+                  </label>
+                  <select
+                    value={reviewStatus}
+                    onChange={(e) => setReviewStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="Approved">Approved — Ready to Proceed to Next Milestone</option>
+                    <option value="Revision Requested">Revision Requested — Changes Needed</option>
+                    <option value="In Review">In Review — Testing / Evaluating Prototype</option>
+                    <option value="Feedback Provided">General Engineering Feedback</option>
+                  </select>
+                </div>
+
+                {/* Review Comment */}
+                <div>
+                  <label className="block font-mono text-slate-700 dark:text-slate-300 mb-1 font-semibold">
+                    Detailed Engineering Review & Comments *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Enter your feedback on the PCB layout, firmware behavior, signal integrity, or required revisions..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 resize-none font-sans"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackModalProject(null)}
+                    className="px-4 py-2 text-xs font-mono text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={reviewSubmitting || !reviewComment.trim()}
+                    className="px-5 py-2.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white font-bold text-xs font-mono rounded-xl hover:from-purple-500 hover:to-cyan-500 transition-all shadow-md shadow-purple-500/20 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {reviewSubmitting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Submit Review to CST</span>
+                      </>
                     )}
                   </button>
                 </div>
