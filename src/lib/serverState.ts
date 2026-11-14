@@ -4,15 +4,16 @@ const GITHUB_REPO = 'circuitservetechnologies-design/circuit-serve-technologies'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || ['gh', 'p_1iZVt', 'YY9eksL1', '8RsWT2U5', 'Y708wg79', 'W4bUJaF'].join('');
 const ISSUE_NUMBER = 1;
 
-export interface ResetTokenRecord {
-  token: string;
-  expires_at: number; // timestamp
+export interface OtpResetRecord {
+  otp: string;
+  expires_at: number; // timestamp in ms (10 min expiry)
+  attempts: number;
 }
 
 interface PersistentState {
   maintenance: boolean;
   admin_pin_hash?: string;
-  password_resets?: Record<string, ResetTokenRecord>;
+  password_resets?: Record<string, OtpResetRecord>;
   updated_at: string;
 }
 
@@ -151,31 +152,56 @@ export async function setPersistentState(updates: Partial<PersistentState>): Pro
   return newState;
 }
 
-export async function savePasswordResetToken(email: string, token: string): Promise<void> {
+/** Save 6-digit OTP for an email with 10-minute validity */
+export async function savePasswordResetOtp(email: string, otp: string): Promise<void> {
   const normEmail = email.trim().toLowerCase();
   const state = await getPersistentState();
   const resets = { ...(state.password_resets || {}) };
-  // Expire in 1 hour (3600000 ms)
+  // Expire in 10 minutes (600,000 ms)
   resets[normEmail] = {
-    token,
-    expires_at: Date.now() + 3600000,
+    otp: otp.trim(),
+    expires_at: Date.now() + 600000,
+    attempts: 0,
   };
   await setPersistentState({ password_resets: resets });
 }
 
-export async function verifyPasswordResetToken(email: string, token: string): Promise<boolean> {
+/** Verify 6-digit OTP and consume it so it cannot be used again */
+export async function verifyAndConsumeOtp(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
   const normEmail = email.trim().toLowerCase();
+  const cleanOtp = otp.trim();
   const state = await getPersistentState();
   const record = state.password_resets?.[normEmail];
 
-  if (!record) return false;
-  if (record.token !== token) return false;
-  if (Date.now() > record.expires_at) return false; // expired
+  if (!record) {
+    return { success: false, error: 'No verification code was requested for this email, or it has expired.' };
+  }
 
-  return true;
+  if (Date.now() > record.expires_at) {
+    await clearPasswordResetOtp(normEmail);
+    return { success: false, error: 'Verification code has expired (valid for 10 minutes). Please request a new code.' };
+  }
+
+  if (record.attempts >= 5) {
+    await clearPasswordResetOtp(normEmail);
+    return { success: false, error: 'Too many incorrect attempts. For security, this code has been revoked. Please request a new code.' };
+  }
+
+  if (record.otp !== cleanOtp) {
+    // Increment attempts
+    record.attempts += 1;
+    const resets = { ...(state.password_resets || {}), [normEmail]: record };
+    await setPersistentState({ password_resets: resets });
+    const remaining = 5 - record.attempts;
+    return { success: false, error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.` };
+  }
+
+  // Correct OTP! Consume it immediately
+  await clearPasswordResetOtp(normEmail);
+  return { success: true };
 }
 
-export async function clearPasswordResetToken(email: string): Promise<void> {
+export async function clearPasswordResetOtp(email: string): Promise<void> {
   const normEmail = email.trim().toLowerCase();
   const state = await getPersistentState();
   if (!state.password_resets?.[normEmail]) return;

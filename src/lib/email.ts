@@ -1,9 +1,9 @@
 import nodemailer from 'nodemailer';
 import { COMPANY_INFO } from './constants';
 
-export async function sendPasswordResetEmail(
+export async function sendOtpVerificationEmail(
   toEmail: string,
-  resetLink: string,
+  otp: string,
   userName?: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   // Check if SMTP environment variables are configured
@@ -13,7 +13,6 @@ export async function sendPasswordResetEmail(
   const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASS;
 
   if (!smtpHost && !smtpUser) {
-    // SMTP not configured yet
     return { success: false, error: 'SMTP configuration not detected in environment variables.' };
   }
 
@@ -38,66 +37,58 @@ export async function sendPasswordResetEmail(
           }
     );
 
-    const displayName = userName ? userName : 'Valued Client';
+    const displayName = userName || 'Valued Client';
 
     const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Reset Your Password - Circuit Serve Technologies</title>
+  <title>Security Verification Code - Circuit Serve Technologies</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #020617; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #020617; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 540px; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #082f49 0%, #0f172a 100%); padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #1e293b;">
               <h1 style="margin: 0; color: #38bdf8; font-size: 20px; font-weight: 800; letter-spacing: 0.5px; font-family: monospace;">CIRCUIT SERVE TECHNOLOGIES</h1>
-              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 11px; font-family: monospace; letter-spacing: 1px;">CLIENT COLLABORATION HUB</p>
+              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 11px; font-family: monospace; letter-spacing: 1px;">CLIENT COLLABORATION HUB • SECURITY AUTHENTICATION</p>
             </td>
           </tr>
 
           <!-- Content -->
           <tr>
             <td style="padding: 36px 32px;">
-              <h2 style="margin: 0 0 16px; color: #ffffff; font-size: 18px; font-weight: 700;">Password Reset Request</h2>
+              <h2 style="margin: 0 0 16px; color: #ffffff; font-size: 18px; font-weight: 700;">Password Reset Verification Code</h2>
               <p style="margin: 0 0 20px; color: #cbd5e1; font-size: 14px; line-height: 1.6;">
                 Hello <strong>${displayName}</strong>,
               </p>
-              <p style="margin: 0 0 28px; color: #94a3b8; font-size: 14px; line-height: 1.6;">
-                We received a request to reset your password for your Circuit Serve Technologies Client Portal account. Click the button below to choose a new password:
+              <p style="margin: 0 0 24px; color: #94a3b8; font-size: 14px; line-height: 1.6;">
+                You requested to reset your password for your Circuit Serve Technologies account. Use the following 6-digit One-Time Password (OTP) to complete the verification:
               </p>
 
-              <!-- Reset Button -->
+              <!-- OTP Block -->
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center" style="padding: 10px 0 30px;">
-                    <a href="${resetLink}" target="_blank" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%); color: #020617; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 10px; font-family: monospace; box-shadow: 0 4px 14px 0 rgba(6, 182, 212, 0.39);">
-                      Reset Password Now
-                    </a>
+                  <td align="center" style="padding: 10px 0 24px;">
+                    <div style="display: inline-block; padding: 18px 36px; background-color: #020617; border: 2px solid #0284c7; border-radius: 12px; text-align: center;">
+                      <span style="font-size: 36px; font-weight: 900; letter-spacing: 12px; color: #38bdf8; font-family: monospace; padding-left: 12px;">${otp}</span>
+                    </div>
                   </td>
                 </tr>
               </table>
 
-              <!-- Link fallback -->
-              <p style="margin: 0 0 12px; color: #64748b; font-size: 12px; line-height: 1.5;">
-                Or copy and paste this link into your browser:
-              </p>
-              <p style="margin: 0 0 24px; color: #38bdf8; font-size: 11px; word-break: break-all; font-family: monospace; background-color: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;">
-                ${resetLink}
-              </p>
-
               <div style="background-color: #020617; border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
                 <p style="margin: 0; color: #fbbf24; font-size: 12px; line-height: 1.5;">
-                  <strong>Note:</strong> This link is valid for <strong>1 hour</strong>. If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged.
+                  <strong>Security Alert:</strong> This code is valid for <strong>10 minutes</strong>. Never share this OTP with anyone. If you did not initiate this password reset request, someone may be attempting to access your account. Please contact us immediately.
                 </p>
               </div>
 
-              <p style="margin: 0; color: #64748b; font-size: 12px;">
-                Need assistance? Contact our engineering team at <a href="mailto:${COMPANY_INFO.contact.email}" style="color: #38bdf8; text-decoration: none;">${COMPANY_INFO.contact.email}</a> or call +91 ${COMPANY_INFO.contact.rawPhone}.
+              <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.5;">
+                Need help? Contact our engineering lab at <a href="mailto:${COMPANY_INFO.contact.email}" style="color: #38bdf8; text-decoration: none;">${COMPANY_INFO.contact.email}</a> or call +91 ${COMPANY_INFO.contact.rawPhone}.
               </p>
             </td>
           </tr>
@@ -119,16 +110,16 @@ export async function sendPasswordResetEmail(
     `;
 
     const info = await transporter.sendMail({
-      from: `"Circuit Serve Technologies" <${smtpUser || COMPANY_INFO.contact.email}>`,
+      from: `"Circuit Serve Technologies Security" <${smtpUser || COMPANY_INFO.contact.email}>`,
       to: toEmail,
-      subject: 'Reset Your Password - Circuit Serve Technologies Client Portal',
+      subject: `Your Security Verification Code: ${otp} - Circuit Serve Technologies`,
       html: htmlContent,
-      text: `Hello ${displayName},\n\nWe received a request to reset your password for Circuit Serve Technologies Client Portal.\n\nPlease reset your password using the link below:\n${resetLink}\n\nThis link expires in 1 hour.\n\nCircuit Serve Technologies\nSurampalem, AP\n${COMPANY_INFO.contact.email}`,
+      text: `Hello ${displayName},\n\nYour Circuit Serve Technologies password reset verification code is: ${otp}\n\nThis code expires in 10 minutes. Never share this code with anyone.\n\nCircuit Serve Technologies\nSurampalem, AP\n${COMPANY_INFO.contact.email}`,
     });
 
     return { success: true, messageId: info.messageId };
   } catch (err: any) {
-    console.error('Failed to send reset email:', err);
-    return { success: false, error: err.message || 'Failed to dispatch email' };
+    console.error('Failed to send OTP email:', err);
+    return { success: false, error: err.message || 'Failed to dispatch verification email' };
   }
 }

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { savePasswordResetToken } from '@/lib/serverState';
-import { sendPasswordResetEmail } from '@/lib/email';
+import { savePasswordResetOtp } from '@/lib/serverState';
+import { sendOtpVerificationEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +11,7 @@ export async function POST(request: Request) {
     const email = body?.email?.trim().toLowerCase();
 
     if (!email || !email.includes('@')) {
-      return NextResponse.json({ success: false, error: 'Please provide a valid email address.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Please enter a valid email address.' }, { status: 400 });
     }
 
     let userName: string | undefined;
@@ -29,25 +28,22 @@ export async function POST(request: Request) {
       }
     }
 
-    // Generate secure token
-    const token = crypto.randomBytes(32).toString('hex');
-    await savePasswordResetToken(email, token);
+    // Generate secure 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await savePasswordResetOtp(email, otp);
 
-    // Get origin
-    const url = new URL(request.url);
-    const origin = url.origin;
-    const resetLink = `${origin}/client/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+    // Dispatch OTP strictly to the registered email address
+    const emailResult = await sendOtpVerificationEmail(email, otp, userName);
 
-    // Attempt to dispatch email via SMTP if configured
-    const emailResult = await sendPasswordResetEmail(email, resetLink, userName);
-
+    // SECURITY: Never return the OTP in the HTTP response.
+    // The user MUST access their registered inbox to obtain the 6-digit OTP code.
     return NextResponse.json({
       success: true,
       emailSent: emailResult.success,
-      resetLink,
+      email,
       message: emailResult.success
-        ? `A secure password reset link has been dispatched to ${email}. Please check your inbox and spam folder.`
-        : `Password reset link generated for ${email}.`,
+        ? `A 6-digit verification code has been dispatched to ${email}. Please check your inbox and spam folder.`
+        : `A 6-digit verification code has been generated and dispatched for ${email}. Please check your email inbox.`,
     });
   } catch (error: any) {
     console.error('Forgot password error:', error);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { verifyPasswordResetToken, clearPasswordResetToken } from '@/lib/serverState';
+import { verifyAndConsumeOtp } from '@/lib/serverState';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,24 +19,24 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const email = body?.email?.trim().toLowerCase();
-    const token = body?.token?.trim();
+    const otp = body?.otp?.trim();
     const newPassword = body?.newPassword?.trim();
 
-    if (!email || !token || !newPassword) {
-      return NextResponse.json({ success: false, error: 'All fields are required.' }, { status: 400 });
+    if (!email || !otp || !newPassword) {
+      return NextResponse.json({ success: false, error: 'Email, verification code, and new password are required.' }, { status: 400 });
     }
 
     if (newPassword.length < 6) {
-      return NextResponse.json({ success: false, error: 'Password must be at least 6 characters.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'New password must be at least 6 characters.' }, { status: 400 });
     }
 
-    // Verify token
-    const isValid = await verifyPasswordResetToken(email, token);
-    if (!isValid) {
+    // Verify 6-digit OTP code against secure cloud state
+    const verification = await verifyAndConsumeOtp(email, otp);
+    if (!verification.success) {
       return NextResponse.json(
         {
           success: false,
-          error: 'This password reset link is invalid or has expired (valid for 1 hour). Please request a new link.',
+          error: verification.error || 'Invalid or expired verification code.',
         },
         { status: 400 }
       );
@@ -56,14 +56,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // Invalidate reset token
-    await clearPasswordResetToken(email);
-
     return NextResponse.json({
       success: true,
       newHash,
       email,
-      message: 'Your password has been successfully reset! You can now log in with your new credentials.',
+      message: 'Your password has been successfully reset! You can now log in with your new password.',
     });
   } catch (error: any) {
     console.error('Password reset confirm error:', error);
