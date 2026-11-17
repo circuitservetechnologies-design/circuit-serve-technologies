@@ -18,11 +18,6 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Ensure password_hash column exists if table was previously created
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
--- Ensure assigned client and feedback columns exist on projects table
-ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS assigned_client_email TEXT;
-ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS assigned_client_name TEXT;
-ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS feedbacks JSONB DEFAULT '[]'::jsonb;
-
 -- 2. Create the client project collaboration proposals table
 CREATE TABLE IF NOT EXISTS public.client_projects (
     id TEXT PRIMARY KEY,
@@ -64,9 +59,17 @@ CREATE TABLE IF NOT EXISTS public.projects (
     featured BOOLEAN DEFAULT false,
     completion_date TEXT,
     demo_url TEXT,
+    assigned_client_email TEXT,
+    assigned_client_name TEXT,
+    feedbacks JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure assigned client and feedback columns exist if table was previously created
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS assigned_client_email TEXT;
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS assigned_client_name TEXT;
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS feedbacks JSONB DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_projects_category ON public.projects(category);
 CREATE INDEX IF NOT EXISTS idx_projects_featured ON public.projects(featured);
