@@ -161,54 +161,51 @@ export function logoutUser() {
 }
 
 export async function getAllUsers(): Promise<User[]> {
-  const localUsers = getStoredUsers();
-
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
       if (!error && data) {
-        // Merge Supabase users with localUsers (deduplicate by email)
-        const userMap = new Map<string, User>();
-        (data as User[]).forEach((u) => {
-          if (u.email) userMap.set(u.email.toLowerCase(), u);
-        });
-        localUsers.forEach((u) => {
-          if (u.email && !userMap.has(u.email.toLowerCase())) {
-            userMap.set(u.email.toLowerCase(), u);
-          }
-        });
-        return Array.from(userMap.values());
+        const supabaseUsers = data as User[];
+        // Supabase is the single source of truth! Keep local storage strictly in sync with Supabase
+        saveStoredUsers(supabaseUsers);
+        return supabaseUsers;
+      }
+      if (error) {
+        console.warn('Supabase getAllUsers error:', error.message);
       }
     } catch (err) {
-      console.warn('Supabase getAllUsers warning:', err);
+      console.warn('Supabase getAllUsers exception:', err);
     }
   }
 
-  return localUsers;
+  return getStoredUsers();
 }
 
 export async function deleteUser(userId: string, userEmail?: string): Promise<{ success: boolean; error?: string }> {
   const users = getStoredUsers();
   const targetUser = users.find((u) => u.id === userId || (userEmail && u.email.toLowerCase() === userEmail.toLowerCase()));
-  const targetEmail = userEmail || targetUser?.email;
+  const targetEmail = (userEmail || targetUser?.email || '').trim().toLowerCase();
 
   // 1. Delete from Supabase if configured
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('users').delete().eq('id', userId);
+      if (userId) {
+        await supabase.from('users').delete().eq('id', userId);
+      }
       if (targetEmail) {
         await supabase.from('users').delete().eq('email', targetEmail);
-        // Also delete any client project proposals created by this user in Supabase
         await supabase.from('client_projects').delete().eq('user_email', targetEmail);
       }
-      await supabase.from('client_projects').delete().eq('user_id', userId);
+      if (userId) {
+        await supabase.from('client_projects').delete().eq('user_id', userId);
+      }
     } catch (err) {
-      console.warn('Supabase delete error:', err);
+      console.warn('Supabase delete exception:', err);
     }
   }
 
   // 2. Delete from local storage users
-  const filteredUsers = users.filter((u) => u.id !== userId && (!targetEmail || u.email.toLowerCase() !== targetEmail.toLowerCase()));
+  const filteredUsers = users.filter((u) => u.id !== userId && (!targetEmail || u.email.toLowerCase() !== targetEmail));
   saveStoredUsers(filteredUsers);
 
   // 3. Delete any client project proposals created by this user in localStorage
@@ -218,7 +215,7 @@ export async function deleteUser(userId: string, userEmail?: string): Promise<{ 
       if (rawProposals) {
         const proposals = JSON.parse(rawProposals) as any[];
         const remaining = proposals.filter(
-          (p) => p.user_id !== userId && (!targetEmail || p.user_email?.toLowerCase() !== targetEmail.toLowerCase())
+          (p) => p.user_id !== userId && (!targetEmail || p.user_email?.toLowerCase() !== targetEmail)
         );
         localStorage.setItem('cst_client_projects_v1', JSON.stringify(remaining));
       }
@@ -234,7 +231,7 @@ export async function deleteUser(userId: string, userEmail?: string): Promise<{ 
       if (rawProj) {
         const projList = JSON.parse(rawProj) as any[];
         const updatedProj = projList.map((p) => {
-          if (p.assigned_client_email?.trim().toLowerCase() === targetEmail.toLowerCase()) {
+          if (p.assigned_client_email?.trim().toLowerCase() === targetEmail) {
             return { ...p, assigned_client_email: undefined, assigned_client_name: undefined };
           }
           return p;
@@ -248,7 +245,7 @@ export async function deleteUser(userId: string, userEmail?: string): Promise<{ 
 
   // 5. If current active session belongs to this user, clear it immediately
   const current = getCurrentUser();
-  if (current && (current.id === userId || (targetEmail && current.email.toLowerCase() === targetEmail.toLowerCase()))) {
+  if (current && (current.id === userId || (targetEmail && current.email.toLowerCase() === targetEmail))) {
     setCurrentUser(null);
   }
 

@@ -281,11 +281,15 @@ export default function AdminPage() {
 
     try {
       await deleteUser(userToDelete.id, userToDelete.email);
-      if (selectedUser?.id === userToDelete.id) {
+      // Immediately remove from UI list state
+      setUsersList((prev) =>
+        prev.filter((u) => u.id !== userToDelete.id && u.email?.toLowerCase() !== userToDelete.email?.toLowerCase())
+      );
+      if (selectedUser?.id === userToDelete.id || selectedUser?.email?.toLowerCase() === userToDelete.email?.toLowerCase()) {
         setSelectedUser(null);
       }
       await loadData();
-      alert(`User account for "${userToDelete.name}" has been deleted.`);
+      alert(`User account for "${userToDelete.name}" has been permanently deleted.`);
     } catch (err) {
       console.error(err);
       alert('Failed to delete user.');
