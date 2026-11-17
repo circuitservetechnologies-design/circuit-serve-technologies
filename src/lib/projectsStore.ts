@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { Project, Inquiry, ClientProject, ProjectFeedback } from '@/types';
+import bundledProjects from '@/data/projects.json';
 
 const LOCAL_STORAGE_KEY_PROJECTS = 'cst_projects_store_v1';
 const LOCAL_STORAGE_KEY_INQUIRIES = 'cst_inquiries_store_v1';
@@ -122,7 +123,65 @@ export async function getProjects(): Promise<Project[]> {
     }
   }
 
+  // Fallback to static bundled projects if database/localStorage has no projects yet
+  if (results.length === 0 && Array.isArray(bundledProjects) && bundledProjects.length > 0) {
+    results = (bundledProjects as any[]).map(unpackProject);
+  }
+
   return results;
+}
+
+/** Sync all offline localStorage projects to the connected Supabase cloud database */
+export async function syncLocalProjectsToSupabase(): Promise<{ synced: number; total: number; message: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { synced: 0, total: 0, message: 'Supabase is not configured yet. Add your URL and Anon Key first.' };
+  }
+  if (typeof window === 'undefined') {
+    return { synced: 0, total: 0, message: 'Browser environment required.' };
+  }
+
+  const stored = localStorage.getItem(LOCAL_STORAGE_KEY_PROJECTS);
+  if (!stored) {
+    return { synced: 0, total: 0, message: 'No offline projects found in this browser.' };
+  }
+
+  const localProjects = (JSON.parse(stored) as Project[]).map(unpackProject);
+  if (localProjects.length === 0) {
+    return { synced: 0, total: 0, message: 'No offline projects to sync.' };
+  }
+
+  let synced = 0;
+  for (const p of localProjects) {
+    try {
+      await addProject({
+        title: p.title,
+        slug: p.slug,
+        category: p.category,
+        summary: p.summary,
+        description: p.description,
+        client: p.client,
+        technologies: p.technologies,
+        features: p.features,
+        image_url: p.image_url,
+        status: p.status,
+        featured: p.featured,
+        completion_date: p.completion_date,
+        demo_url: p.demo_url,
+        assigned_client_email: p.assigned_client_email,
+        assigned_client_name: p.assigned_client_name,
+        feedbacks: p.feedbacks,
+      });
+      synced++;
+    } catch (err) {
+      console.error('Failed syncing project to Supabase:', p.title, err);
+    }
+  }
+
+  return {
+    synced,
+    total: localProjects.length,
+    message: `Successfully uploaded ${synced} of ${localProjects.length} offline project(s) to Supabase cloud!`,
+  };
 }
 
 export async function addProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {

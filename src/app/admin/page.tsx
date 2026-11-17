@@ -11,7 +11,8 @@ import {
   getClientProjects,
   updateClientProject,
   deleteClientProject,
-  publishClientProjectToPublicPortfolio
+  publishClientProjectToPublicPortfolio,
+  syncLocalProjectsToSupabase
 } from '@/lib/projectsStore';
 import { getAllUsers, deleteUser } from '@/lib/auth';
 import { getMaintenanceStatus, setMaintenanceStatus } from '@/lib/maintenance';
@@ -53,6 +54,7 @@ import {
   X,
   Wrench,
   Upload,
+  Download,
   Image as ImageIcon,
   Star
 } from 'lucide-react';
@@ -74,6 +76,10 @@ export default function AdminPage() {
   const [copiedContactId, setCopiedContactId] = useState<string | null>(null);
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [copiedExport, setCopiedExport] = useState(false);
 
   // Form State for Add / Edit Public Portfolio
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1512,14 +1518,94 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
 
             {/* List */}
             <div className="lg:col-span-7 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  Published Projects ({projects.length})
-                </h3>
-                <span className="text-xs font-mono text-slate-500">
-                  Click Edit on any project to modify details or re-assign client
-                </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Published Projects ({projects.length})
+                  </h3>
+                  <span className="text-xs font-mono text-slate-500">
+                    Click Edit on any project to modify details or re-assign client
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCopiedExport(false);
+                      setExportModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-mono font-medium rounded-lg bg-slate-100 dark:bg-navy-950 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-colors"
+                    title="Export projects JSON to bake into website code"
+                  >
+                    <Download className="w-3.5 h-3.5 text-cyan-500" />
+                    <span>Export JSON</span>
+                  </button>
+
+                  {isSupabaseConfigured && (
+                    <button
+                      type="button"
+                      disabled={syncLoading}
+                      onClick={async () => {
+                        setSyncLoading(true);
+                        setSyncResult(null);
+                        try {
+                          const res = await syncLocalProjectsToSupabase();
+                          setSyncResult(res.message);
+                          await loadData();
+                        } catch (e: any) {
+                          setSyncResult('Sync error: ' + (e.message || 'Failed'));
+                        } finally {
+                          setSyncLoading(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 transition-colors"
+                      title="Upload offline projects to Supabase cloud"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? 'animate-spin' : ''}`} />
+                      <span>Sync to Cloud</span>
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {!isSupabaseConfigured && (
+                <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-2">
+                  <div className="flex items-center gap-2 font-bold font-mono text-amber-800 dark:text-amber-300">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Why are projects only visible on your laptop?</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    You are in <strong>Offline Local Storage Mode</strong>. Projects you create here are currently saved inside <strong>this laptop browser's private memory</strong>. Visitors on other phones and devices cannot see them until they are stored in the cloud (Supabase) or baked into the website code.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCopiedExport(false);
+                        setExportModalOpen(true);
+                      }}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold shadow-sm"
+                    >
+                      Click Here to Export Projects JSON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('setup')}
+                      className="px-2.5 py-1 bg-white dark:bg-navy-900 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 rounded font-medium hover:border-amber-500"
+                    >
+                      View Database Setup Guide
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {syncResult && (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs rounded-xl flex items-center justify-between">
+                  <span>{syncResult}</span>
+                  <button onClick={() => setSyncResult(null)} className="text-xs font-mono underline ml-2">Dismiss</button>
+                </div>
+              )}
 
               {projects.length === 0 ? (
                 <div className="p-12 text-center rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 space-y-3">
@@ -2022,6 +2108,66 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EXPORT PROJECTS JSON MODAL */}
+      {exportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-cyan-800/60 rounded-2xl p-6 space-y-4 max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Download className="w-5 h-5 text-cyan-500" />
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Export Portfolio Projects ({projects.length})
+                </h3>
+              </div>
+              <button
+                onClick={() => setExportModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Click <strong>Copy JSON</strong> below and paste it in our chat! We will commit it directly into the website's code so your projects are permanently visible to <strong>every visitor on any phone, tablet, or laptop worldwide</strong> without needing a database.
+            </p>
+
+            <textarea
+              readOnly
+              rows={12}
+              value={JSON.stringify(projects, null, 2)}
+              className="w-full p-3 font-mono text-[11px] bg-slate-900 text-cyan-300 rounded-xl border border-slate-700 select-all"
+            />
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-[11px] font-mono text-slate-500">
+                {projects.length} project(s) ready to export
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(JSON.stringify(projects, null, 2));
+                    setCopiedExport(true);
+                    setTimeout(() => setCopiedExport(false), 3000);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-white dark:text-navy-950 font-mono font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5"
+                >
+                  {copiedExport ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedExport ? 'Copied to Clipboard!' : 'Copy JSON'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-navy-950 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-mono text-xs rounded-xl"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
