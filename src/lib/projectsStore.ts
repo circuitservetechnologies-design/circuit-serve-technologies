@@ -86,37 +86,25 @@ export async function getProjects(): Promise<Project[]> {
 
       if (error) {
         console.warn('Error fetching from Supabase, falling back to local storage:', error.message);
-      } else if (data && data.length > 0) {
+      } else if (data) {
         results = data.map(unpackProject);
+        // Supabase is the source of truth! Sync localStorage to match Supabase exactly
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(results));
+        }
+        return results;
       }
     } catch (err) {
       console.error('Supabase query failed:', err);
     }
   }
 
-  // Fallback / merge with localStorage in browser environment
+  // Fallback to localStorage ONLY if Supabase is NOT configured or had a query error
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY_PROJECTS);
       if (stored) {
-        const localProjects = (JSON.parse(stored) as any[]).map(unpackProject);
-        if (results.length === 0) {
-          results = localProjects;
-        } else {
-          // If Supabase returned results, merge any client assignment or feedback from local storage if missing in Supabase
-          results = results.map((remote) => {
-            const match = localProjects.find((lp) => lp.id === remote.id || lp.title === remote.title);
-            if (match) {
-              return {
-                ...remote,
-                assigned_client_email: remote.assigned_client_email || match.assigned_client_email,
-                assigned_client_name: remote.assigned_client_name || match.assigned_client_name,
-                feedbacks: (remote.feedbacks && remote.feedbacks.length > 0) ? remote.feedbacks : (match.feedbacks || []),
-              };
-            }
-            return remote;
-          });
-        }
+        results = (JSON.parse(stored) as any[]).map(unpackProject);
       }
     } catch (e) {
       console.error('Local storage read error:', e);
@@ -367,16 +355,19 @@ export async function getProjectsForClient(clientEmail: string): Promise<Project
   return all.filter(p => p.assigned_client_email?.trim().toLowerCase() === normalized);
 }
 
-export async function deleteProject(id: string): Promise<boolean> {
+export async function deleteProject(id: string, title?: string): Promise<boolean> {
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase
+      await supabase
         .from('projects')
         .delete()
         .eq('id', id);
 
-      if (error) {
-        console.warn('Supabase delete error:', error.message);
+      if (title) {
+        await supabase
+          .from('projects')
+          .delete()
+          .eq('title', title);
       }
     } catch (err) {
       console.error('Supabase delete failed:', err);
@@ -388,7 +379,9 @@ export async function deleteProject(id: string): Promise<boolean> {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY_PROJECTS);
       if (stored) {
         const existing = JSON.parse(stored) as Project[];
-        const filtered = existing.filter(p => p.id !== id);
+        const filtered = existing.filter(
+          (p) => p.id !== id && (!title || p.title.trim().toLowerCase() !== title.trim().toLowerCase())
+        );
         localStorage.setItem(LOCAL_STORAGE_KEY_PROJECTS, JSON.stringify(filtered));
       }
     } catch (e) {
@@ -505,21 +498,23 @@ export async function updateClientProject(id: string, updates: Partial<ClientPro
 export async function deleteClientProject(id: string): Promise<boolean> {
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase.from('client_projects').delete().eq('id', id);
-      if (!error) return true;
+      await supabase.from('client_projects').delete().eq('id', id);
     } catch (err) {
-      console.warn(err);
+      console.warn('Supabase delete client project failed:', err);
     }
   }
 
   if (typeof window !== 'undefined') {
-    const list: ClientProject[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS) || '[]');
-    const filtered = list.filter((p) => p.id !== id);
-    localStorage.setItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS, JSON.stringify(filtered));
-    return true;
+    try {
+      const list: ClientProject[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS) || '[]');
+      const filtered = list.filter((p) => p.id !== id);
+      localStorage.setItem(LOCAL_STORAGE_KEY_CLIENT_PROJECTS, JSON.stringify(filtered));
+    } catch (e) {
+      console.warn('Local storage delete client project error:', e);
+    }
   }
 
-  return false;
+  return true;
 }
 
 // Allows Admin to promote an approved client project directly to the Public Portfolio Showcase!

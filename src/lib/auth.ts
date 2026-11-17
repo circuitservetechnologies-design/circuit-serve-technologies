@@ -187,25 +187,68 @@ export async function getAllUsers(): Promise<User[]> {
   return localUsers;
 }
 
-export async function deleteUser(userId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteUser(userId: string, userEmail?: string): Promise<{ success: boolean; error?: string }> {
+  const users = getStoredUsers();
+  const targetUser = users.find((u) => u.id === userId || (userEmail && u.email.toLowerCase() === userEmail.toLowerCase()));
+  const targetEmail = userEmail || targetUser?.email;
+
   // 1. Delete from Supabase if configured
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase.from('users').delete().eq('id', userId);
-      if (error) console.warn('Supabase delete user notice:', error);
+      await supabase.from('users').delete().eq('id', userId);
+      if (targetEmail) {
+        await supabase.from('users').delete().eq('email', targetEmail);
+        // Also delete any client project proposals created by this user in Supabase
+        await supabase.from('client_projects').delete().eq('user_email', targetEmail);
+      }
+      await supabase.from('client_projects').delete().eq('user_id', userId);
     } catch (err) {
       console.warn('Supabase delete error:', err);
     }
   }
 
-  // 2. Delete from local storage
-  const users = getStoredUsers();
-  const filtered = users.filter((u) => u.id !== userId);
-  saveStoredUsers(filtered);
+  // 2. Delete from local storage users
+  const filteredUsers = users.filter((u) => u.id !== userId && (!targetEmail || u.email.toLowerCase() !== targetEmail.toLowerCase()));
+  saveStoredUsers(filteredUsers);
 
-  // If current session is this user, clear session
+  // 3. Delete any client project proposals created by this user in localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const rawProposals = localStorage.getItem('cst_client_projects_v1');
+      if (rawProposals) {
+        const proposals = JSON.parse(rawProposals) as any[];
+        const remaining = proposals.filter(
+          (p) => p.user_id !== userId && (!targetEmail || p.user_email?.toLowerCase() !== targetEmail.toLowerCase())
+        );
+        localStorage.setItem('cst_client_projects_v1', JSON.stringify(remaining));
+      }
+    } catch (e) {
+      console.warn('Error cleaning client proposals for deleted user:', e);
+    }
+  }
+
+  // 4. If any projects in public projects were assigned to this user, unassign them
+  if (targetEmail && typeof window !== 'undefined') {
+    try {
+      const rawProj = localStorage.getItem('cst_projects_store_v1');
+      if (rawProj) {
+        const projList = JSON.parse(rawProj) as any[];
+        const updatedProj = projList.map((p) => {
+          if (p.assigned_client_email?.trim().toLowerCase() === targetEmail.toLowerCase()) {
+            return { ...p, assigned_client_email: undefined, assigned_client_name: undefined };
+          }
+          return p;
+        });
+        localStorage.setItem('cst_projects_store_v1', JSON.stringify(updatedProj));
+      }
+    } catch (e) {
+      console.warn('Error unassigning projects for deleted user:', e);
+    }
+  }
+
+  // 5. If current active session belongs to this user, clear it immediately
   const current = getCurrentUser();
-  if (current && current.id === userId) {
+  if (current && (current.id === userId || (targetEmail && current.email.toLowerCase() === targetEmail.toLowerCase()))) {
     setCurrentUser(null);
   }
 

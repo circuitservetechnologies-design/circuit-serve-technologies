@@ -8,6 +8,7 @@ import { useAuth } from '@/components/AuthContext';
 import { submitClientProject, getClientProjects, getProjects, addProjectFeedback } from '@/lib/projectsStore';
 import { ClientProject, Project, ProjectFeedback } from '@/types';
 import { COMPANY_INFO } from '@/lib/constants';
+import { getAllUsers } from '@/lib/auth';
 import {
   Cpu,
   Plus,
@@ -313,35 +314,30 @@ export default function ClientPortalPage() {
     if (!user) return;
     setLoadingProjects(true);
     try {
+      // 0. Verify this user account is still valid and not deleted by admin
+      const allUsers = await getAllUsers();
+      const stillActive = allUsers.some(
+        (u) => u.id === user.id || u.email.trim().toLowerCase() === user.email.trim().toLowerCase()
+      );
+      if (!stillActive) {
+        logout();
+        return;
+      }
+
       // 1. Projects requested by this client
       const data = await getClientProjects(user.id);
-      setClientProjects(data);
+      setClientProjects(
+        data.filter(
+          (cp) => cp.user_id === user.id || cp.user_email?.toLowerCase() === user.email.toLowerCase()
+        )
+      );
 
       // 2. Official CST Projects assigned by Admin specifically to this client for review
       const allCst = await getProjects();
       const userEmailNorm = user.email.trim().toLowerCase();
-      let assigned = allCst.filter(
+      const assigned = allCst.filter(
         (p) => p.assigned_client_email?.trim().toLowerCase() === userEmailNorm
       );
-
-      // Fallback: if Supabase returned projects but none are assigned (missing column migration),
-      // also check localStorage for the assignment data which is always written there by admin
-      if (assigned.length === 0 && typeof window !== 'undefined') {
-        try {
-          const lsRaw = localStorage.getItem('cst_projects_store_v1');
-          if (lsRaw) {
-            const lsProjects = JSON.parse(lsRaw) as Project[];
-            const lsAssigned = lsProjects.filter(
-              (p) => p.assigned_client_email?.trim().toLowerCase() === userEmailNorm
-            );
-            if (lsAssigned.length > 0) {
-              assigned = lsAssigned;
-            }
-          }
-        } catch (e) {
-          console.warn('localStorage fallback for assigned projects failed:', e);
-        }
-      }
 
       setAssignedCstProjects(assigned);
     } catch (err) {

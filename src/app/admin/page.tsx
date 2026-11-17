@@ -280,7 +280,7 @@ export default function AdminPage() {
     if (!confirmDelete) return;
 
     try {
-      await deleteUser(userToDelete.id);
+      await deleteUser(userToDelete.id, userToDelete.email);
       if (selectedUser?.id === userToDelete.id) {
         setSelectedUser(null);
       }
@@ -1690,7 +1690,7 @@ CREATE POLICY "Enable all for inquiries" ON public.inquiries FOR ALL USING (true
                         <button
                           onClick={async () => {
                             if (confirm(`Delete project "${p.title}"?`)) {
-                              await deleteProject(p.id);
+                              await deleteProject(p.id, p.title);
                               // Reset edit form if we were editing this project
                               if (editingId === p.id) handleCancelEdit();
                               // Also reset is_published_to_portfolio on any client proposal linked by title
@@ -2008,6 +2008,35 @@ CREATE TABLE IF NOT EXISTS public.client_projects (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );`}
             </pre>
+
+            {/* Cache Management Card */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="font-bold text-xs font-mono text-slate-800 dark:text-slate-200">
+                  Browser Cache & Stale Data Cleanup
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  If you deleted users or projects and want to force-clear any old offline storage on this laptop:
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Clear local browser storage cache? This will purge any lingering deleted projects or users from this browser and reload fresh.')) {
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('cst_projects_store_v1');
+                      localStorage.removeItem('cst_users_v1');
+                      localStorage.removeItem('cst_client_projects_v1');
+                      localStorage.removeItem('cst_auth_session');
+                      window.location.reload();
+                    }
+                  }
+                }}
+                className="px-3 py-1.5 text-xs font-mono font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 transition-colors shrink-0"
+              >
+                Purge Local Browser Cache
+              </button>
+            </div>
           </div>
         )}
 

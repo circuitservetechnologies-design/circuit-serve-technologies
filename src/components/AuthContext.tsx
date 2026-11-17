@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@/types';
-import { getCurrentUser, loginUser, registerClient, logoutUser } from '@/lib/auth';
+import { getCurrentUser, loginUser, registerClient, logoutUser, getAllUsers } from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -29,9 +29,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const current = getCurrentUser();
-    setUser(current);
-    setLoading(false);
+    async function initSession() {
+      const current = getCurrentUser();
+      if (!current) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Optimistically set the user so UI renders quickly
+      setUser(current);
+
+      try {
+        // Validate against server/database to verify user has not been deleted by admin
+        const users = await getAllUsers();
+        const exists = users.find(
+          (u) => u.id === current.id || u.email.trim().toLowerCase() === current.email.trim().toLowerCase()
+        );
+
+        if (!exists) {
+          // User was deleted in admin! Invalidate session immediately
+          logoutUser();
+          setUser(null);
+        } else {
+          setUser(exists);
+        }
+      } catch (e) {
+        console.warn('Session verification fallback error:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    initSession();
   }, []);
 
   const login = async (email: string, passOrPin: string) => {
